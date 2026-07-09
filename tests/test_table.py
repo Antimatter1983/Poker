@@ -30,3 +30,39 @@ def test_blinds_are_posted() -> None:
     assert table.players[0].current_bet == 10
     assert table.pot == 15
     assert table.current_bet == 10
+
+
+def test_flop_adds_three_community_cards() -> None:
+    table = make_table()
+    engine = MatchEngine(table)
+    engine.start_hand()
+
+    engine.deal_flop()
+
+    assert len(table.community_cards) == 3
+    assert table.street == "flop"
+
+
+def test_turn_adds_one_community_card() -> None:
+    table = make_table()
+    engine = MatchEngine(table)
+    engine.start_hand()
+    engine.deal_flop()
+
+    engine.deal_turn()
+
+    assert len(table.community_cards) == 4
+    assert table.street == "turn"
+
+
+def test_river_adds_one_community_card() -> None:
+    table = make_table()
+    engine = MatchEngine(table)
+    engine.start_hand()
+    engine.deal_flop()
+    engine.deal_turn()
+
+    engine.deal_river()
+
+    assert len(table.community_cards) == 5
+    assert table.street == "river"
