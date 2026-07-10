@@ -1,10 +1,10 @@
-"""Run a minimal Texas Hold'em deal from the command line."""
+"""Example: run a complete Texas Hold'em board deal."""
 
-import sys
-from pathlib import Path
 from collections.abc import Sequence
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _bootstrap import add_project_root_to_path
+
+add_project_root_to_path()
 
 from poker.cards import Card
 from poker.engine import MatchEngine
@@ -25,16 +25,27 @@ def main() -> None:
     engine = MatchEngine(table)
 
     engine.start_hand()
-    engine.deal_flop()
-    engine.deal_turn()
-    engine.deal_river()
-
+    print("After blinds and hole cards:")
     for player in table.players:
-        print(f"{player.name}: {format_cards(player.hand)}")
+        print(
+            f"  {player.name}: hand {format_cards(player.hand)}, "
+            f"stack {player.stack}, current bet {player.current_bet}"
+        )
+    print(f"  Pot: {table.pot}")
+
+    engine.deal_flop()
     print(f"Flop: {format_cards(table.community_cards[:3])}")
+
+    engine.deal_turn()
     print(f"Turn: {table.community_cards[3]}")
+
+    engine.deal_river()
     print(f"River: {table.community_cards[4]}")
-    print(f"Pot: {table.pot}")
+
+    print("Final table state:")
+    print(f"  Street: {table.street}")
+    print(f"  Board: {format_cards(table.community_cards)}")
+    print(f"  Pot: {table.pot}")
 
 
 if __name__ == "__main__":
