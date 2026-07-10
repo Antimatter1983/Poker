@@ -28,8 +28,8 @@ def test_start_hand_posts_blinds_and_deals_two_hole_cards() -> None:
     engine.start_hand()
 
     assert [len(player.hand) for player in table.players] == [2, 2]
-    assert table.players[1].current_bet == 5
-    assert table.players[0].current_bet == 10
+    assert table.players[0].current_bet == 5
+    assert table.players[1].current_bet == 10
     assert table.pot == 15
     assert table.current_bet == 10
     assert table.street == "preflop"

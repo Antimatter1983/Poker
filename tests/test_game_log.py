@@ -53,10 +53,15 @@ def test_engine_records_events_in_expected_order() -> None:
         "hole_cards",
         "hole_cards",
         "hole_cards",
+        "first_actor",
         "call",
+        "next_actor",
         "flop",
+        "first_actor",
         "turn",
+        "first_actor",
         "river",
+        "first_actor",
     ]
 
 
@@ -69,7 +74,7 @@ def test_log_contains_expected_entries_after_hand_flow() -> None:
     engine.apply_action(ActionRequest(player_id="p2", action=PlayerAction.CALL))
     engine.apply_action(ActionRequest(player_id="p3", action=PlayerAction.CHECK))
     engine.deal_flop()
-    engine.apply_action(ActionRequest(player_id="p1", action=PlayerAction.BET, amount=20))
+    engine.apply_action(ActionRequest(player_id="p2", action=PlayerAction.BET, amount=20))
 
     events = table.game_log.events()
     event_types = [event.event_type for event in events]
@@ -83,7 +88,7 @@ def test_log_contains_expected_entries_after_hand_flow() -> None:
         "hole_cards",
         "hole_cards",
     ]
-    assert event_types[-2:] == ["flop", "bet"]
+    assert event_types[-3:] == ["first_actor", "bet", "next_actor"]
     assert any("Bob posted small blind 5" in description for description in descriptions)
     assert any("Charlie posted big blind 10" in description for description in descriptions)
     assert any("Alice: Call 10" in description for description in descriptions)
