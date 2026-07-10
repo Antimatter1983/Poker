@@ -18,6 +18,34 @@ class PlayerAction(Enum):
     ALL_IN = auto()
 
 
+class ActionError(ValueError):
+    """Base class for invalid player action requests."""
+
+
+class PlayerNotFoundError(ActionError):
+    """Raised when an action references a player outside the table."""
+
+
+class ActionNotAvailableError(ActionError):
+    """Raised when an action is not currently available to the player."""
+
+
+class MissingAmountError(ActionError):
+    """Raised when an action requires an amount but none was supplied."""
+
+
+class NonPositiveAmountError(ActionError):
+    """Raised when a supplied action amount is zero or negative."""
+
+
+class StackExceededError(ActionError):
+    """Raised when a bet or raise requires more chips than the player has."""
+
+
+class InvalidRaiseError(ActionError):
+    """Raised when a raise does not produce a valid larger full bet."""
+
+
 @dataclass(frozen=True, slots=True)
 class ActionRequest:
     """A requested action from a player."""
@@ -66,6 +94,7 @@ def available_actions(player: Player, table: Table) -> set[PlayerAction]:
         }
 
     return {
+        PlayerAction.FOLD,
         PlayerAction.CHECK,
         PlayerAction.BET,
         PlayerAction.ALL_IN,

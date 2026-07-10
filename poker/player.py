@@ -1,8 +1,14 @@
 """Player model for the poker engine."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from poker.cards import Card
+
+if TYPE_CHECKING:
+    from poker.actions import PlayerAction
 
 
 @dataclass(slots=True)
@@ -16,6 +22,7 @@ class Player:
     current_bet: int = 0
     folded: bool = False
     all_in: bool = False
+    last_action: PlayerAction | None = None
 
     def reset_for_new_hand(self) -> None:
         """Clear per-hand state before a new hand starts."""
@@ -24,6 +31,7 @@ class Player:
         self.current_bet = 0
         self.folded = False
         self.all_in = False
+        self.last_action = None
 
     def call_amount(self, table_current_bet: int) -> int:
         """Return chips needed to match the table bet, never below zero."""

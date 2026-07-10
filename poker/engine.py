@@ -1,11 +1,24 @@
 """Match engine for simple Texas Hold'em hand flow."""
 
+from poker.actions import (
+    ActionNotAvailableError,
+    ActionRequest,
+    ActionResult,
+    InvalidRaiseError,
+    MissingAmountError,
+    NonPositiveAmountError,
+    PlayerAction,
+    PlayerNotFoundError,
+    StackExceededError,
+    available_actions,
+)
 from poker.deck import Deck
+from poker.player import Player
 from poker.table import Table
 
 
 class MatchEngine:
-    """Coordinates dealing and blind posting for a table."""
+    """Coordinates dealing, blind posting, and single-player actions."""
 
     def __init__(self, table: Table, deck: Deck | None = None) -> None:
         self.table = table
@@ -34,6 +47,96 @@ class MatchEngine:
         self.table.pot += small_blind_paid + big_blind_paid
         self.table.current_bet = max(small_blind_player.current_bet, big_blind_player.current_bet)
         self.table.street = "preflop"
+
+    def apply_action(self, request: ActionRequest) -> ActionResult:
+        """Apply one validated player action and return the resulting state.
+
+        This method intentionally handles only one action. It does not advance
+        action order, complete betting rounds, create side pots, or end hands.
+        """
+
+        player = self._find_player(request.player_id)
+        actions = available_actions(player, self.table)
+        if request.action not in actions:
+            raise ActionNotAvailableError(
+                f"Action {request.action.name} is not available for player {request.player_id}"
+            )
+
+        amount_paid = 0
+        if request.action is PlayerAction.FOLD:
+            player.folded = True
+        elif request.action is PlayerAction.CHECK:
+            self._ensure_check_allowed(player)
+        elif request.action is PlayerAction.CALL:
+            amount_paid = player.bet(player.call_amount(self.table.current_bet))
+            self.table.pot += amount_paid
+        elif request.action is PlayerAction.BET:
+            amount_paid = self._apply_bet(player, request.amount)
+        elif request.action is PlayerAction.RAISE:
+            amount_paid = self._apply_raise(player, request.amount)
+        elif request.action is PlayerAction.ALL_IN:
+            amount_paid = player.bet(player.stack)
+            self.table.pot += amount_paid
+            if player.current_bet > self.table.current_bet:
+                self.table.current_bet = player.current_bet
+
+        player.last_action = request.action
+        return ActionResult(
+            player_id=player.id,
+            action=request.action,
+            amount_paid=amount_paid,
+            player_stack=player.stack,
+            player_current_bet=player.current_bet,
+            table_current_bet=self.table.current_bet,
+            pot=self.table.pot,
+        )
+
+    def _find_player(self, player_id: str) -> Player:
+        for player in self.table.players:
+            if player.id == player_id:
+                return player
+        raise PlayerNotFoundError(f"Player {player_id} was not found at table {self.table.table_id}")
+
+    def _ensure_check_allowed(self, player: Player) -> None:
+        if player.call_amount(self.table.current_bet) != 0:
+            raise ActionNotAvailableError(f"Player {player.id} cannot check while facing a bet")
+
+    def _require_positive_amount(self, amount: int | None) -> int:
+        if amount is None:
+            raise MissingAmountError("Action amount is required")
+        if amount <= 0:
+            raise NonPositiveAmountError("Action amount must be positive")
+        return amount
+
+    def _apply_bet(self, player: Player, requested_amount: int | None) -> int:
+        if self.table.current_bet != 0:
+            raise ActionNotAvailableError("Bet is not available after a bet already exists")
+        amount = self._require_positive_amount(requested_amount)
+        if amount > player.stack:
+            raise StackExceededError("Bet amount cannot exceed player stack")
+
+        amount_paid = player.bet(amount)
+        self.table.pot += amount_paid
+        self.table.current_bet = player.current_bet
+        return amount_paid
+
+    def _apply_raise(self, player: Player, requested_amount: int | None) -> int:
+        if self.table.current_bet == 0:
+            raise ActionNotAvailableError("Raise is not available before a bet exists")
+        amount = self._require_positive_amount(requested_amount)
+        if amount <= self.table.current_bet:
+            raise InvalidRaiseError("Raise amount must be greater than the current table bet")
+
+        additional_amount = amount - player.current_bet
+        if additional_amount <= 0:
+            raise InvalidRaiseError("Raise amount must exceed the player's current bet")
+        if additional_amount > player.stack:
+            raise StackExceededError("Raise amount cannot exceed player stack")
+
+        amount_paid = player.bet(additional_amount)
+        self.table.pot += amount_paid
+        self.table.current_bet = player.current_bet
+        return amount_paid
 
     def deal_hole_cards(self) -> None:
         """Deal two private cards to each player."""
