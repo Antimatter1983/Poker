@@ -25,6 +25,11 @@ class Player:
         self.folded = False
         self.all_in = False
 
+    def call_amount(self, table_current_bet: int) -> int:
+        """Return chips needed to match the table bet, never below zero."""
+
+        return max(table_current_bet - self.current_bet, 0)
+
     def bet(self, amount: int) -> int:
         """Move chips from the stack into the current bet and return paid amount."""
 
