@@ -15,9 +15,16 @@ poker/
   table.py
   engine.py
 examples/
-  test_deal.py
+  _bootstrap.py
+  example_deck.py
+  example_full_deal.py
+  example_player.py
+  example_table.py
 tests/
+  test_cards.py
   test_deck.py
+  test_engine.py
+  test_player.py
   test_table.py
 ```
 
@@ -39,14 +46,33 @@ tests/
 - Side pots.
 - WebSocket or Django integration.
 
-## Run the example
+## Run examples
+
+Examples are small educational scripts that can be launched from the project root:
 
 ```bash
-python examples/test_deal.py
+python examples/example_deck.py
+python examples/example_player.py
+python examples/example_table.py
+python examples/example_full_deal.py
 ```
 
 ## Run tests
 
+Run the full automated test suite with pytest:
+
 ```bash
 python -m pytest
+```
+
+Run one test file:
+
+```bash
+python -m pytest tests/test_deck.py
+```
+
+Run one specific test function:
+
+```bash
+python -m pytest tests/test_deck.py::test_deck_has_52_unique_cards
 ```
