@@ -16,6 +16,7 @@ from poker.actions import (
 from poker.cards import Card, Rank, Suit
 from poker.deck import Deck
 from poker.engine import MatchEngine
+from poker.game_log import GameEvent, GameLog
 from poker.player import Player
 from poker.table import Table
 
@@ -26,6 +27,8 @@ __all__ = [
     "ActionResult",
     "Card",
     "Deck",
+    "GameEvent",
+    "GameLog",
     "InvalidRaiseError",
     "MissingAmountError",
     "NonPositiveAmountError",
