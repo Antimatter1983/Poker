@@ -35,12 +35,17 @@ class MatchEngine:
         self._log_event("hand_start", f"Hand started at table {self.table.table_id}")
         self.post_blinds()
         self.deal_hole_cards()
+        self.table.set_first_actor()
 
     def post_blinds(self) -> None:
         """Post small and big blinds."""
 
-        small_blind_player = self.table.player_at(self.table.button_position + 1)
-        big_blind_player = self.table.player_at(self.table.button_position + 2)
+        if len(self.table.players) == 2:
+            small_blind_player = self.table.player_at(self.table.button_position)
+            big_blind_player = self.table.player_at(self.table.button_position + 1)
+        else:
+            small_blind_player = self.table.player_at(self.table.button_position + 1)
+            big_blind_player = self.table.player_at(self.table.button_position + 2)
 
         small_blind_paid = small_blind_player.bet(self.table.small_blind)
         big_blind_paid = big_blind_player.bet(self.table.big_blind)
@@ -71,6 +76,7 @@ class MatchEngine:
         """
 
         player = self._find_player(request.player_id)
+        self._ensure_player_turn(player)
         actions = available_actions(player, self.table)
         if request.action not in actions:
             raise ActionNotAvailableError(
@@ -100,6 +106,7 @@ class MatchEngine:
             request.action.name.lower(),
             self._describe_action(player, request.action, amount_paid),
         )
+        self.table.move_to_next_actor()
         return ActionResult(
             player_id=player.id,
             action=request.action,
@@ -109,6 +116,16 @@ class MatchEngine:
             table_current_bet=self.table.current_bet,
             pot=self.table.pot,
         )
+
+
+    def _ensure_player_turn(self, player: Player) -> None:
+        acting_player = self.table.get_acting_player()
+        if acting_player is None:
+            return
+        if acting_player.id != player.id:
+            raise ActionNotAvailableError(
+                f"It is {acting_player.name}'s turn to act, not player {player.id}"
+            )
 
     def _find_player(self, player_id: str) -> Player:
         for player in self.table.players:
@@ -177,6 +194,7 @@ class MatchEngine:
         self.table.street = "flop"
         cards = " ".join(str(card) for card in self.table.community_cards[:3])
         self._log_event("flop", f"Flop opened: {cards}")
+        self.table.set_first_actor()
 
     def deal_turn(self) -> None:
         """Deal the one-card turn."""
@@ -185,6 +203,7 @@ class MatchEngine:
         self.table.community_cards.extend(self.deck.deal_many(1))
         self.table.street = "turn"
         self._log_event("turn", f"Turn opened: {self.table.community_cards[3]}")
+        self.table.set_first_actor()
 
     def deal_river(self) -> None:
         """Deal the one-card river."""
@@ -193,6 +212,7 @@ class MatchEngine:
         self.table.community_cards.extend(self.deck.deal_many(1))
         self.table.street = "river"
         self._log_event("river", f"River opened: {self.table.community_cards[4]}")
+        self.table.set_first_actor()
 
     def _reset_betting_round(self) -> None:
         """Reset per-street betting state before opening a new board card."""
