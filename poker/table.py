@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from poker.cards import Card
+from poker.game_log import GameLog
 from poker.player import Player
 
 
@@ -19,6 +20,7 @@ class Table:
     community_cards: list[Card] = field(default_factory=list)
     current_bet: int = 0
     street: str = "pre_hand"
+    game_log: GameLog = field(default_factory=GameLog)
 
     def reset_for_new_hand(self) -> None:
         """Reset hand-specific table and player state."""
@@ -27,6 +29,7 @@ class Table:
         self.community_cards.clear()
         self.current_bet = 0
         self.street = "preflop"
+        self.game_log.clear()
         for player in self.players:
             player.reset_for_new_hand()
 

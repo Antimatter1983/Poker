@@ -32,6 +32,7 @@ class MatchEngine:
         self.deck = Deck()
         self.deck.shuffle()
         self.table.reset_for_new_hand()
+        self._log_event("hand_start", f"Hand started at table {self.table.table_id}")
         self.post_blinds()
         self.deal_hole_cards()
 
@@ -44,9 +45,23 @@ class MatchEngine:
         small_blind_paid = small_blind_player.bet(self.table.small_blind)
         big_blind_paid = big_blind_player.bet(self.table.big_blind)
 
-        self.table.pot += small_blind_paid + big_blind_paid
-        self.table.current_bet = max(small_blind_player.current_bet, big_blind_player.current_bet)
+        self.table.pot += small_blind_paid
+        self.table.current_bet = small_blind_player.current_bet
         self.table.street = "preflop"
+        self._log_event(
+            "small_blind",
+            f"{small_blind_player.name} posted small blind {small_blind_paid}",
+        )
+
+        self.table.pot += big_blind_paid
+        self.table.current_bet = max(
+            small_blind_player.current_bet,
+            big_blind_player.current_bet,
+        )
+        self._log_event(
+            "big_blind",
+            f"{big_blind_player.name} posted big blind {big_blind_paid}",
+        )
 
     def apply_action(self, request: ActionRequest) -> ActionResult:
         """Apply one validated player action and return the resulting state.
@@ -81,6 +96,10 @@ class MatchEngine:
                 self.table.current_bet = player.current_bet
 
         player.last_action = request.action
+        self._log_event(
+            request.action.name.lower(),
+            self._describe_action(player, request.action, amount_paid),
+        )
         return ActionResult(
             player_id=player.id,
             action=request.action,
@@ -95,7 +114,9 @@ class MatchEngine:
         for player in self.table.players:
             if player.id == player_id:
                 return player
-        raise PlayerNotFoundError(f"Player {player_id} was not found at table {self.table.table_id}")
+        raise PlayerNotFoundError(
+            f"Player {player_id} was not found at table {self.table.table_id}"
+        )
 
     def _ensure_check_allowed(self, player: Player) -> None:
         if player.call_amount(self.table.current_bet) != 0:
@@ -144,21 +165,72 @@ class MatchEngine:
         for _ in range(2):
             for player in self.table.players:
                 player.hand.append(self.deck.deal_one())
+        for player in self.table.players:
+            cards = " ".join(str(card) for card in player.hand)
+            self._log_event("hole_cards", f"Dealt hole cards to {player.name}: {cards}")
 
     def deal_flop(self) -> None:
         """Deal the three-card flop."""
 
+        self._reset_betting_round()
         self.table.community_cards.extend(self.deck.deal_many(3))
         self.table.street = "flop"
+        cards = " ".join(str(card) for card in self.table.community_cards[:3])
+        self._log_event("flop", f"Flop opened: {cards}")
 
     def deal_turn(self) -> None:
         """Deal the one-card turn."""
 
+        self._reset_betting_round()
         self.table.community_cards.extend(self.deck.deal_many(1))
         self.table.street = "turn"
+        self._log_event("turn", f"Turn opened: {self.table.community_cards[3]}")
 
     def deal_river(self) -> None:
         """Deal the one-card river."""
 
+        self._reset_betting_round()
         self.table.community_cards.extend(self.deck.deal_many(1))
         self.table.street = "river"
+        self._log_event("river", f"River opened: {self.table.community_cards[4]}")
+
+    def _reset_betting_round(self) -> None:
+        """Reset per-street betting state before opening a new board card."""
+
+        self.table.current_bet = 0
+        for player in self.table.players:
+            player.current_bet = 0
+
+    def _log_event(self, event_type: str, description: str) -> None:
+        """Record a table-state event in the game log."""
+
+        self.table.game_log.add_event(
+            event_type=event_type,
+            description=description,
+            street=self.table.street,
+            pot=self.table.pot,
+            current_bet=self.table.current_bet,
+        )
+
+    def _describe_action(
+        self, player: Player, action: PlayerAction, amount_paid: int
+    ) -> str:
+        """Build a readable description for a player action event."""
+
+        action_names = {
+            PlayerAction.FOLD: "Fold",
+            PlayerAction.CHECK: "Check",
+            PlayerAction.CALL: "Call",
+            PlayerAction.BET: "Bet",
+            PlayerAction.RAISE: "Raise",
+            PlayerAction.ALL_IN: "All-in",
+        }
+        description = f"{player.name}: {action_names[action]}"
+        if action in {
+            PlayerAction.CALL,
+            PlayerAction.BET,
+            PlayerAction.RAISE,
+            PlayerAction.ALL_IN,
+        }:
+            description += f" {amount_paid}"
+        return description
