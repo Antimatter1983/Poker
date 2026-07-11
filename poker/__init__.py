@@ -13,6 +13,7 @@ from poker.actions import (
     StackExceededError,
     available_actions,
 )
+from poker.betting import BettingActionProcessor
 from poker.cards import Card, Rank, Suit
 from poker.deck import Deck
 from poker.engine import MatchEngine
@@ -25,6 +26,7 @@ __all__ = [
     "ActionNotAvailableError",
     "ActionRequest",
     "ActionResult",
+    "BettingActionProcessor",
     "Card",
     "Deck",
     "GameEvent",
