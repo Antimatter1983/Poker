@@ -7,7 +7,12 @@ open tournaments.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from contextlib import nullcontext
+from threading import RLock
 from time import monotonic
+
+from django.conf import settings
+from django.db import transaction
 from secrets import token_hex
 
 from poker.hand_engine import BET, CALL, CHECK, FOLD, RAISE, ALL_IN, HandEngine
@@ -17,6 +22,12 @@ WAITING = "waiting"
 RUNNING = "running"
 FINISHED = "finished"
 HAND_RESULT_PAUSE_SECONDS = 15
+
+
+def _safe_atomic():
+    if settings.configured:
+        return transaction.atomic()
+    return nullcontext()
 
 
 @dataclass
@@ -30,6 +41,7 @@ class LobbyTournament:
     game: Tournament | None = None
     finished_hand_at: float | None = None
     next_hand_actor_name: str | None = None
+    _advance_lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def add_player(self, name: str) -> None:
         name = name.strip()
@@ -78,14 +90,29 @@ class LobbyTournament:
         if self.finished_hand_at is None:
             self.finished_hand_at = monotonic()
             self.next_hand_actor_name = self._latest_finished_player_name()
-        if not force and self.seconds_until_next_hand_ready() > 0:
+        if force:
+            self.complete_current_hand_and_maybe_start_next()
+
+    def complete_current_hand_and_maybe_start_next(self) -> None:
+        """Start the next shared hand once, after every current table is finished."""
+        if self.game is None or self.status != RUNNING or not self.all_hands_finished():
             return
-        if self.game.hand_number >= self.game.hand_count:
-            self.status = FINISHED
-            return
-        self.finished_hand_at = None
-        self.next_hand_actor_name = None
-        self.game.start_next_hand()
+        completed_hand_number = self.game.hand_number
+        with _safe_atomic():
+            with self._advance_lock:
+                if self.game is None or self.status != RUNNING:
+                    return
+                if self.game.hand_number != completed_hand_number or not self.all_hands_finished():
+                    return
+                if self.finished_hand_at is None:
+                    self.finished_hand_at = monotonic()
+                    self.next_hand_actor_name = self._latest_finished_player_name()
+                if self.game.hand_number >= self.game.hand_count:
+                    self.status = FINISHED
+                    return
+                self.finished_hand_at = None
+                self.next_hand_actor_name = None
+                self.game.start_next_hand()
 
     def all_hands_finished(self) -> bool:
         return bool(self.game and self.game.tables and all(table.engine.finished for table in self.game.tables))
@@ -114,6 +141,14 @@ class LobbyTournament:
 
     def can_advance_hand(self) -> bool:
         return self.status == RUNNING and self.game is not None and self.all_hands_finished()
+
+    def finished_player_count(self, hand_number: int | None = None) -> int:
+        if self.game is None or hand_number is None or hand_number != self.game.hand_number:
+            return len(self.player_names)
+        return sum(1 for table in self.game.tables if table.engine.finished)
+
+    def next_hand_ready(self, completed_hand_number: int) -> bool:
+        return bool(self.game and self.game.hand_number > completed_hand_number) or self.status == FINISHED
 
     def unfinished_player_names(self) -> list[str]:
         if self.game is None:
@@ -169,8 +204,9 @@ def card_text(cards) -> str:
 def card_view(cards) -> list[dict[str, str | bool]]:
     suit_symbols = {"S": "♠", "H": "♥", "D": "♦", "C": "♣"}
     red_suits = {"H", "D"}
+    rank_labels = {"T": "10"}
     return [
-        {"rank": card.rank, "suit": suit_symbols[card.suit], "red": card.suit in red_suits}
+        {"rank": rank_labels.get(card.rank, card.rank), "suit": suit_symbols[card.suit], "red": card.suit in red_suits}
         for card in cards
     ]
 
