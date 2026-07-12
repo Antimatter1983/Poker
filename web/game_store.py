@@ -16,7 +16,7 @@ from poker.tournament import HAND_COUNT, Tournament
 WAITING = "waiting"
 RUNNING = "running"
 FINISHED = "finished"
-HAND_RESULT_PAUSE_SECONDS = 6
+HAND_RESULT_PAUSE_SECONDS = 5
 
 
 @dataclass
@@ -68,13 +68,13 @@ class LobbyTournament:
     def advance_finished_hands(self, force: bool = False) -> None:
         if self.game is None or self.status != RUNNING:
             return
-        if not all(table.engine.finished for table in self.game.tables):
+        if not self.all_hands_finished():
             self.finished_hand_at = None
             return
         if self.finished_hand_at is None:
             self.finished_hand_at = monotonic()
             return
-        if not force and monotonic() - self.finished_hand_at < HAND_RESULT_PAUSE_SECONDS:
+        if not force and self.seconds_until_next_hand_ready() > 0:
             return
         if self.game.hand_number >= self.game.hand_count:
             self.status = FINISHED
@@ -85,8 +85,17 @@ class LobbyTournament:
     def all_hands_finished(self) -> bool:
         return bool(self.game and self.game.tables and all(table.engine.finished for table in self.game.tables))
 
+    def seconds_until_next_hand_ready(self) -> int:
+        if not self.all_hands_finished():
+            return HAND_RESULT_PAUSE_SECONDS
+        if self.finished_hand_at is None:
+            self.finished_hand_at = monotonic()
+            return HAND_RESULT_PAUSE_SECONDS
+        elapsed = monotonic() - self.finished_hand_at
+        return max(0, int(HAND_RESULT_PAUSE_SECONDS - elapsed + 0.999))
+
     def can_advance_hand(self) -> bool:
-        return self.status == RUNNING and self.all_hands_finished() and self.game is not None
+        return self.status == RUNNING and self.game is not None and self.all_hands_finished() and self.seconds_until_next_hand_ready() == 0
 
     def standings(self) -> list[tuple[str, int]]:
         if self.game is None:

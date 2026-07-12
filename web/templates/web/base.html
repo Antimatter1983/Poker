@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Poker Tournament{% endblock %}</title>
+  {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="{% static 'web/style.css' %}">
 </head>
 <body class="{% block body_class %}{% endblock %}">

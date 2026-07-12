@@ -37,10 +37,12 @@ def create_tournament(request: HttpRequest):
 
 def tournament_detail(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
+    lobby.advance_finished_hands()
     player_name = request.session.get(f"player:{code}")
     table = lobby.table_for(player_name) if player_name else None
     engine = table.engine if table else None
-    player_turn = bool(engine and table and engine.current_player is table.player)
+    player_turn = bool(engine and table and not engine.finished and engine.current_player is table.player)
+    next_hand_wait_seconds = lobby.seconds_until_next_hand_ready() if lobby.all_hands_finished() else None
     context = {
         "lobby": lobby,
         "player_name": player_name,
@@ -56,6 +58,7 @@ def tournament_detail(request: HttpRequest, code: str):
         "race_standings": lobby.race_standings(),
         "can_advance_hand": lobby.can_advance_hand(),
         "final_hand_ready": bool(lobby.game and lobby.game.hand_number >= lobby.hand_count and lobby.can_advance_hand()),
+        "next_hand_wait_seconds": next_hand_wait_seconds,
     }
     return render(request, "web/tournament.html", context)
 
