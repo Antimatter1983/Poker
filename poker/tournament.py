@@ -7,7 +7,7 @@ from time import monotonic
 
 from .bot import CallBot
 from .deck import Deck
-from .hand_engine import HandEngine
+from .hand_engine import CHECK, FOLD, HandEngine
 from .player import Player
 
 STARTING_STACK = 1000
@@ -57,11 +57,11 @@ class Tournament:
         deck = Deck(); deck.shuffle(); shared_cards = list(deck.cards)
         self.hand_number += 1
         for table in self.tables:
-            button_id = table.player.player_id
+            button_id = table.player.player_id if self.hand_number % 2 else table.bot.player_id
             table.engine = HandEngine(table.player, table.bot, button_id, self.small_blind, self.big_blind)
             table.engine.start_hand(deck_cards=shared_cards)
         self._run_ready_bots()
-        self.action_deadline = monotonic() + self.action_timeout_seconds
+        self._reset_action_deadline()
 
     def submit_player_action(self, player_id: str, action: str, amount: int | None = None) -> None:
         table = self._table_for(player_id)
@@ -72,7 +72,30 @@ class Tournament:
         table.engine.act(action, amount)
         self._run_ready_bots()
         if self.all_tables_waiting_at_barrier():
-            self.action_deadline = monotonic() + self.action_timeout_seconds
+            self._reset_action_deadline()
+
+    def process_timeouts(self) -> list[str]:
+        """Auto-play overdue human turns and return affected player ids."""
+        if self.action_deadline is None or monotonic() < self.action_deadline:
+            return []
+        timed_out: list[str] = []
+        for table in self.tables:
+            if table.engine.finished or table.engine.current_player is not table.player:
+                continue
+            legal = table.engine.legal_actions(table.player)
+            table.engine.act(CHECK if CHECK in legal else FOLD)
+            timed_out.append(table.player.player_id)
+        if timed_out:
+            self._run_ready_bots()
+        self._reset_action_deadline()
+        return timed_out
+
+    def seconds_to_action_deadline(self) -> int | None:
+        if self.action_deadline is None:
+            return None
+        if not any((not table.engine.finished and table.engine.current_player is table.player) for table in self.tables):
+            return None
+        return max(0, int(self.action_deadline - monotonic() + 0.999))
 
     def all_tables_waiting_at_barrier(self) -> bool:
         streets = {table.engine.street for table in self.tables}
@@ -89,6 +112,12 @@ class Tournament:
         standings = self.standings()
         best_stack = standings[0][1]
         return [player_id for player_id, stack in standings if stack == best_stack]
+
+    def _reset_action_deadline(self) -> None:
+        if any((not table.engine.finished and table.engine.current_player is table.player) for table in self.tables):
+            self.action_deadline = monotonic() + self.action_timeout_seconds
+        else:
+            self.action_deadline = None
 
     def _run_ready_bots(self) -> None:
         for table in self.tables:

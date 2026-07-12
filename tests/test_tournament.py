@@ -83,7 +83,7 @@ def finish_player_hand(tournament, player_id):
         tournament.submit_player_action(player_id, action)
 
 
-def test_lobby_next_hand_waits_five_seconds_after_all_tables_finish(monkeypatch):
+def test_lobby_next_hand_waits_for_player_button_after_all_tables_finish(monkeypatch):
     from web import game_store
 
     now = 100.0
@@ -95,16 +95,10 @@ def test_lobby_next_hand_waits_five_seconds_after_all_tables_finish(monkeypatch)
 
     lobby.advance_finished_hands()
     assert lobby.game.hand_number == 1
-    assert not lobby.can_advance_hand()
-    assert lobby.seconds_until_next_hand_ready() == 5
-
-    now = 104.9
-    assert not lobby.can_advance_hand()
+    assert lobby.can_advance_hand()
     assert lobby.game.hand_number == 1
 
-    now = 105.0
-    assert lobby.can_advance_hand()
-    lobby.advance_finished_hands()
+    lobby.advance_finished_hands(force=True)
     assert lobby.game.hand_number == 2
     assert not lobby.game.tables[0].engine.finished
 
@@ -119,3 +113,30 @@ def test_finished_table_does_not_offer_player_actions():
 
     assert table.engine.finished
     assert game_store.legal_action_options(table.engine) == []
+
+
+def test_blinds_alternate_between_player_and_bot_each_hand():
+    tournament = Tournament.create_by_admin("admin", "daily", ["alice"], hand_count=2)
+    tournament.start_next_hand()
+    table = tournament.tables[0]
+    assert table.engine.small_blind_player is table.player
+    finish_player_hand(tournament, "alice")
+    tournament.start_next_hand()
+    assert table.engine.small_blind_player is table.bot
+
+
+def test_overdue_player_turn_auto_checks_or_folds(monkeypatch):
+    import poker.tournament as tournament_module
+
+    now = 100.0
+    monkeypatch.setattr(tournament_module, "monotonic", lambda: now)
+    tournament = Tournament.create_by_admin("admin", "daily", ["alice"])
+    tournament.start_next_hand()
+    table = tournament.tables[0]
+    assert table.engine.current_player is table.player
+
+    now = 111.0
+    timed_out = tournament.process_timeouts()
+
+    assert timed_out == ["alice"]
+    assert table.engine.finished

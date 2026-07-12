@@ -59,6 +59,10 @@ def tournament_detail(request: HttpRequest, code: str):
         "can_advance_hand": lobby.can_advance_hand(),
         "final_hand_ready": bool(lobby.game and lobby.game.hand_number >= lobby.hand_count and lobby.can_advance_hand()),
         "next_hand_wait_seconds": next_hand_wait_seconds,
+        "action_timer_seconds": lobby.game.seconds_to_action_deadline() if lobby.game else None,
+        "unfinished_players": lobby.unfinished_player_names(),
+        "hero_blind": "МБ" if engine and table and engine.small_blind_player is table.player else "ББ" if engine and table else "",
+        "bot_blind": "МБ" if engine and table and engine.small_blind_player is table.bot else "ББ" if engine and table else "",
     }
     return render(request, "web/tournament.html", context)
 
@@ -95,7 +99,8 @@ def next_hand(request: HttpRequest, code: str):
         if lobby.status == game_store.FINISHED:
             raise ValueError("Турнир уже завершён")
         if not lobby.can_advance_hand():
-            raise ValueError("Следующая раздача станет доступна после последних ходов всех игроков")
+            waiting = ", ".join(lobby.unfinished_player_names()) or "другие игроки"
+            raise ValueError(f"Игроки {waiting} ещё играют раздачу. Ждите.")
         lobby.advance_finished_hands(force=True)
         if lobby.status == game_store.FINISHED:
             messages.success(request, "Турнир завершён")
