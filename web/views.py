@@ -38,7 +38,6 @@ def create_tournament(request: HttpRequest):
 def tournament_detail(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
     player_name = request.session.get(f"player:{code}")
-    lobby.advance_finished_hands()
     table = lobby.table_for(player_name) if player_name else None
     engine = table.engine if table else None
     player_turn = bool(engine and table and engine.current_player is table.player)
@@ -54,6 +53,9 @@ def tournament_detail(request: HttpRequest, code: str):
         "legal_actions": game_store.legal_action_options(engine) if player_turn else [],
         "betting_buttons": game_store.betting_buttons(engine, table.player) if player_turn else [],
         "result": game_store.hand_result(engine, table.player.player_id if table else None),
+        "race_standings": lobby.race_standings(),
+        "can_advance_hand": lobby.can_advance_hand(),
+        "final_hand_ready": bool(lobby.game and lobby.game.hand_number >= lobby.hand_count and lobby.can_advance_hand()),
     }
     return render(request, "web/tournament.html", context)
 
@@ -84,6 +86,24 @@ def start_tournament(request: HttpRequest, code: str):
 
 
 @require_POST
+def next_hand(request: HttpRequest, code: str):
+    lobby = _lobby_or_404(code)
+    try:
+        if lobby.status == game_store.FINISHED:
+            raise ValueError("Турнир уже завершён")
+        if not lobby.can_advance_hand():
+            raise ValueError("Следующая раздача станет доступна после последних ходов всех игроков")
+        lobby.advance_finished_hands(force=True)
+        if lobby.status == game_store.FINISHED:
+            messages.success(request, "Турнир завершён")
+        else:
+            messages.success(request, "Открыта следующая раздача")
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    return redirect("web:tournament_detail", code=code)
+
+
+@require_POST
 def submit_action(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
     player_name = request.session.get(f"player:{code}")
@@ -107,7 +127,6 @@ def submit_action(request: HttpRequest, code: str):
 
 def leaderboard(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
-    lobby.advance_finished_hands()
     return render(request, "web/leaderboard.html", {"lobby": lobby})
 
 
