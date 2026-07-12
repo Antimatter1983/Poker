@@ -1,0 +1,31 @@
+{% extends 'web/base.html' %}
+{% block title %}Ожидание · {{ lobby.title }}{% endblock %}
+{% block content %}
+<section class="card stack waiting-banner" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}">
+  <p class="eyebrow">Общая раздача №{{ completed_hand_number }}</p>
+  <h1>Ожидаем остальных игроков</h1>
+  <p><b data-finished-count>{{ finished_player_count }}</b> из <b data-total-count>{{ total_player_count }}</b> участников завершили раздачу.</p>
+  <p>Статус текущей общей раздачи: <strong data-common-status>{{ common_hand_status }}</strong></p>
+  {% if result %}<p>Ваш итог по фишкам: <strong>{% if result.player_won %}+{% elif result.split %}{% else %}-{% endif %}{{ result.amount }}</strong></p>{% endif %}
+</section>
+<script>
+(function(){
+  const box = document.querySelector('[data-status-url]');
+  const finished = box.querySelector('[data-finished-count]');
+  const total = box.querySelector('[data-total-count]');
+  const status = box.querySelector('[data-common-status]');
+  async function poll(){
+    try {
+      const response = await fetch(box.dataset.statusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.status === 'reveal' && data.url) window.location.href = data.url;
+      if (finished && data.finished_count !== undefined) finished.textContent = data.finished_count;
+      if (total && data.total_count !== undefined) total.textContent = data.total_count;
+      if (status && data.status) status.textContent = data.status.toUpperCase();
+    } catch (e) { console.warn('Polling failed', e); }
+  }
+  setInterval(poll, 1500); poll();
+})();
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import Http404, HttpRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from . import game_store
 
@@ -15,6 +15,13 @@ def _lobby_or_404(code: str) -> game_store.LobbyTournament:
     except ValueError as exc:
         raise Http404(str(exc)) from exc
 
+
+
+def _require_player(lobby: game_store.LobbyTournament, code: str, request: HttpRequest) -> str:
+    player_name = request.session.get(f"player:{code}")
+    if not player_name or player_name not in lobby.player_names:
+        raise Http404("Вы не участвуете в этом турнире")
+    return player_name
 
 
 def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | None, *, is_waiting_room: bool = False, completed_hand_number: int | None = None):
@@ -37,6 +44,7 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
         "bot_hand_summary": game_store.current_hand_summary((table.bot.cards if table and engine and engine.finished else []) + (engine.community_cards if engine else [])),
         "race_standings": lobby.race_standings(),
         "can_advance_hand": lobby.can_advance_hand(),
+        "common_hand_status": lobby.hand_state,
         "player_can_advance_hand": False if is_waiting_room else lobby.player_can_advance_hand(player_name),
         "next_hand_actor_name": lobby.next_hand_actor_name,
         "final_hand_ready": bool(lobby.game and lobby.game.hand_number >= lobby.hand_count and lobby.can_advance_hand()),
@@ -77,29 +85,63 @@ def tournament_detail(request: HttpRequest, code: str):
     player_name = request.session.get(f"player:{code}")
     table = lobby.table_for(player_name) if player_name else None
     if table and lobby.status == game_store.RUNNING and table.engine.finished:
+        lobby.mark_waiting_or_reveal()
+        if lobby.hand_state == game_store.HAND_REVEAL:
+            return redirect("web:hand_results", code=code, hand_number=lobby.game.hand_number)
         return redirect("web:hand_wait", code=code, hand_number=lobby.game.hand_number)
     return render(request, "web/tournament.html", _tournament_context(lobby, player_name))
 
 
 def hand_wait(request: HttpRequest, code: str, hand_number: int):
     lobby = _lobby_or_404(code)
-    player_name = request.session.get(f"player:{code}")
-    return render(request, "web/tournament.html", _tournament_context(lobby, player_name, is_waiting_room=True, completed_hand_number=hand_number))
+    player_name = _require_player(lobby, code, request)
+    if not lobby.game or hand_number != lobby.game.hand_number:
+        return redirect("web:tournament_detail", code=code)
+    lobby.mark_waiting_or_reveal()
+    if lobby.hand_state == game_store.HAND_REVEAL:
+        return redirect("web:hand_results", code=code, hand_number=hand_number)
+    return render(request, "web/hand_wait.html", _tournament_context(lobby, player_name, is_waiting_room=True, completed_hand_number=hand_number))
 
 
+@require_GET
 def hand_status(request: HttpRequest, code: str, hand_number: int):
     lobby = _lobby_or_404(code)
+    _require_player(lobby, code, request)
+    if not lobby.game or hand_number != lobby.game.hand_number:
+        return JsonResponse({"status": "next_hand", "url": reverse("web:tournament_detail", kwargs={"code": code})})
     if lobby.game:
         lobby.game.process_timeouts()
-    lobby.complete_current_hand_and_maybe_start_next()
-    next_ready = lobby.next_hand_ready(hand_number)
-    return JsonResponse({
-        "next_hand_ready": next_ready,
-        "next_url": reverse("web:tournament_detail", kwargs={"code": code}) if next_ready else "",
-        "finished_count": lobby.finished_player_count(hand_number),
-        "total_count": len(lobby.player_names),
-        "status": lobby.status,
-    })
+    lobby.mark_waiting_or_reveal()
+    if lobby.hand_state == game_store.HAND_REVEAL:
+        return JsonResponse({"status": "reveal", "url": reverse("web:hand_results", kwargs={"code": code, "hand_number": hand_number})})
+    return JsonResponse({"status": "waiting", "finished_count": lobby.finished_player_count(hand_number), "total_count": len(lobby.player_names)})
+
+
+def hand_results(request: HttpRequest, code: str, hand_number: int):
+    lobby = _lobby_or_404(code)
+    player_name = _require_player(lobby, code, request)
+    if not lobby.game or hand_number != lobby.game.hand_number:
+        return redirect("web:tournament_detail", code=code)
+    lobby.mark_waiting_or_reveal()
+    if lobby.hand_state != game_store.HAND_REVEAL:
+        return redirect("web:hand_wait", code=code, hand_number=hand_number)
+    context = _tournament_context(lobby, player_name, completed_hand_number=hand_number)
+    context.update({"results": game_store.hand_results(lobby), "seconds_left": lobby.reveal_seconds_left()})
+    return render(request, "web/hand_results.html", context)
+
+
+@require_GET
+def reveal_status(request: HttpRequest, code: str, hand_number: int):
+    lobby = _lobby_or_404(code)
+    _require_player(lobby, code, request)
+    if not lobby.game:
+        raise Http404("Турнир не начат")
+    if lobby.hand_state != game_store.HAND_REVEAL and lobby.game.hand_number == hand_number:
+        return JsonResponse({"status": "waiting", "finished_count": lobby.finished_player_count(hand_number), "total_count": len(lobby.player_names)})
+    new_hand = lobby.get_or_create_next_hand_after_reveal(hand_number)
+    if new_hand:
+        return JsonResponse({"status": "next_hand", "url": reverse("web:tournament_detail", kwargs={"code": code})})
+    return JsonResponse({"status": "reveal", "seconds_left": lobby.reveal_seconds_left()})
 
 
 @require_POST
@@ -170,7 +212,9 @@ def submit_action(request: HttpRequest, code: str):
         lobby.game.submit_player_action(player_name, action, amount)
         table = lobby.table_for(player_name)
         if table and table.engine.finished:
-            lobby.complete_current_hand_and_maybe_start_next()
+            lobby.mark_waiting_or_reveal()
+            if lobby.hand_state == game_store.HAND_REVEAL:
+                return redirect("web:hand_results", code=code, hand_number=hand_number)
             return redirect("web:hand_wait", code=code, hand_number=hand_number)
         lobby.advance_finished_hands()
     except ValueError as exc:

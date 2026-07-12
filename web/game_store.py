@@ -21,7 +21,12 @@ from poker.tournament import HAND_COUNT, Tournament
 WAITING = "waiting"
 RUNNING = "running"
 FINISHED = "finished"
-HAND_RESULT_PAUSE_SECONDS = 15
+
+HAND_PLAYING = "PLAYING"
+HAND_WAITING = "WAITING"
+HAND_REVEAL = "REVEAL"
+REVEAL_SECONDS = 20
+HAND_RESULT_PAUSE_SECONDS = REVEAL_SECONDS
 
 
 def _safe_atomic():
@@ -41,6 +46,10 @@ class LobbyTournament:
     game: Tournament | None = None
     finished_hand_at: float | None = None
     next_hand_actor_name: str | None = None
+    hand_state: str = HAND_PLAYING
+    reveal_started_at: float | None = None
+    reveal_until: float | None = None
+    next_hand_by_completed_hand: dict[int, int] = field(default_factory=dict)
     _advance_lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def add_player(self, name: str) -> None:
@@ -68,6 +77,7 @@ class LobbyTournament:
         self.finished_hand_at = None
         self.next_hand_actor_name = None
         self.game.start_next_hand()
+        self.hand_state = HAND_PLAYING
 
     def finish(self) -> None:
         if self.status == WAITING:
@@ -110,9 +120,67 @@ class LobbyTournament:
                 if self.game.hand_number >= self.game.hand_count:
                     self.status = FINISHED
                     return
-                self.finished_hand_at = None
-                self.next_hand_actor_name = None
-                self.game.start_next_hand()
+                self._start_next_hand_locked(completed_hand_number)
+
+    def mark_waiting_or_reveal(self) -> None:
+        if self.game is None or self.status != RUNNING:
+            return
+        if self.all_hands_finished():
+            self.start_reveal()
+        elif any(table.engine.finished for table in self.game.tables):
+            self.hand_state = HAND_WAITING
+
+    def start_reveal(self) -> None:
+        if self.game is None or self.status != RUNNING or not self.all_hands_finished():
+            return
+        with _safe_atomic():
+            with self._advance_lock:
+                if self.game is None or self.status != RUNNING or not self.all_hands_finished():
+                    return
+                if self.hand_state != HAND_REVEAL:
+                    self.hand_state = HAND_REVEAL
+                    self.reveal_started_at = monotonic()
+                    self.reveal_until = self.reveal_started_at + REVEAL_SECONDS
+                    self.finished_hand_at = self.reveal_started_at
+                    self.next_hand_actor_name = self._latest_finished_player_name()
+
+    def reveal_seconds_left(self) -> int:
+        if self.reveal_until is None:
+            return REVEAL_SECONDS
+        return max(0, int(self.reveal_until - monotonic() + 0.999))
+
+    def get_or_create_next_hand_after_reveal(self, completed_hand_number: int) -> int | None:
+        if self.game is None:
+            return None
+        with _safe_atomic():
+            with self._advance_lock:
+                if self.game is None:
+                    return None
+                existing = self.next_hand_by_completed_hand.get(completed_hand_number)
+                if existing:
+                    return existing
+                if self.game.hand_number > completed_hand_number:
+                    self.next_hand_by_completed_hand[completed_hand_number] = self.game.hand_number
+                    return self.game.hand_number
+                if self.status != RUNNING or self.hand_state != HAND_REVEAL or self.reveal_seconds_left() > 0:
+                    return None
+                if self.game.hand_number >= self.game.hand_count:
+                    self.status = FINISHED
+                    return None
+                return self._start_next_hand_locked(completed_hand_number)
+
+    def _start_next_hand_locked(self, completed_hand_number: int) -> int:
+        existing = self.next_hand_by_completed_hand.get(completed_hand_number)
+        if existing:
+            return existing
+        self.finished_hand_at = None
+        self.next_hand_actor_name = None
+        self.reveal_started_at = None
+        self.reveal_until = None
+        self.hand_state = HAND_PLAYING
+        self.game.start_next_hand()
+        self.next_hand_by_completed_hand[completed_hand_number] = self.game.hand_number
+        return self.game.hand_number
 
     def all_hands_finished(self) -> bool:
         return bool(self.game and self.game.tables and all(table.engine.finished for table in self.game.tables))
@@ -143,7 +211,9 @@ class LobbyTournament:
         return self.status == RUNNING and self.game is not None and self.all_hands_finished()
 
     def finished_player_count(self, hand_number: int | None = None) -> int:
-        if self.game is None or hand_number is None or hand_number != self.game.hand_number:
+        if self.game is None or hand_number is None:
+            return len(self.player_names)
+        if hand_number != self.game.hand_number:
             return len(self.player_names)
         return sum(1 for table in self.game.tables if table.engine.finished)
 
@@ -293,3 +363,28 @@ def current_hand_summary(cards) -> str:
     if pairs == 1:
         return HAND_NAMES[2]
     return HAND_NAMES[1]
+
+
+def hand_results(lobby: LobbyTournament) -> list[dict]:
+    if lobby.game is None:
+        return []
+    rows = []
+    for table in lobby.game.tables:
+        engine = table.engine
+        player = table.player
+        bot = table.bot
+        result = hand_result(engine, player.player_id)
+        player_value = engine.hand_values.get(player.player_id)
+        bot_value = engine.hand_values.get(bot.player_id)
+        rows.append({
+            "player_name": player.player_id,
+            "player_cards": card_view(player.cards),
+            "bot_cards": card_view(bot.cards),
+            "board": card_view(engine.community_cards),
+            "player_hand": player_value.name if player_value else (result or {}).get("player_hand", "fold"),
+            "bot_hand": bot_value.name if bot_value else (result or {}).get("bot_hand", "fold"),
+            "winner": "Ничья" if result and result["split"] else player.player_id if result and result["player_won"] else "Бот",
+            "net": player.stack - engine.starting_stacks.get(player.player_id, player.stack),
+            "result": result,
+        })
+    return rows
