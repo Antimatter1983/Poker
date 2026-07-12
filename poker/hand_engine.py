@@ -35,9 +35,14 @@ class HandEngine:
     def big_blind_player(self):
         return self.players[1] if self.players[0].player_id == self.small_blind_player_id else self.players[0]
 
-    def start_hand(self) -> None:
+    def start_hand(self, deck_cards: list | None = None) -> None:
         self._validate()
-        self.deck = Deck(); self.deck.shuffle(); self.community_cards = []
+        self.deck = Deck()
+        if deck_cards is None:
+            self.deck.shuffle()
+        else:
+            self.deck.cards = list(deck_cards)
+        self.community_cards = []
         self.pot = 0; self.street = PREFLOP; self.current_bet = self.big_blind; self.min_raise = self.big_blind
         self.finished = False; self.winners = []; self.hand_values = {}; self.finish_reason = None; self.returned_chips = 0
         for p in self.players: p.reset_for_new_hand()
@@ -55,11 +60,29 @@ class HandEngine:
         to_call = self.to_call(p)
         actions = [FOLD, ALL_IN]
         actions.append(CHECK if to_call == 0 else CALL)
-        actions.append(BET if self.current_bet == 0 else RAISE)
+        if self.max_bet_or_raise_to(p) is not None:
+            actions.append(BET if self.current_bet == 0 else RAISE)
         return actions
 
     def to_call(self, player: Player) -> int:
         return max(0, self.current_bet - player.street_bet)
+
+    def max_bet_or_raise_to(self, player: Player) -> int | None:
+        """Maximum total street bet allowed by the tournament pot-limit rule.
+
+        The project rule caps the raise/bet increase at the current pot size before
+        the action. Returned value uses the engine convention: total amount committed
+        by this player on the current street, not the extra chips to add.
+        """
+        if not player.can_act():
+            return None
+        if self.current_bet == 0:
+            minimum = self.big_blind
+        else:
+            minimum = self.current_bet + self.min_raise
+        maximum = player.street_bet + self.to_call(player) + min(player.stack - self.to_call(player), self.pot)
+        maximum = min(maximum, player.street_bet + player.stack)
+        return maximum if maximum >= minimum else None
 
     def act(self, action: str, amount: int | None = None) -> None:
         if self.finished: raise ValueError("Hand is already finished")
@@ -93,6 +116,9 @@ class HandEngine:
         increase = amount - self.current_bet
         minimum = self.min_raise if is_raise else self.big_blind
         if increase < minimum: raise ValueError(f"Minimum {'raise' if is_raise else 'bet'} is {self.current_bet + minimum if is_raise else minimum}")
+        maximum = self.max_bet_or_raise_to(p)
+        if maximum is None or amount > maximum:
+            raise ValueError(f"Maximum {'raise' if is_raise else 'bet'} is {maximum}")
         self.pot += p.commit_chips(amount - p.street_bet)
         self._set_aggressor(p, amount, increase)
 
