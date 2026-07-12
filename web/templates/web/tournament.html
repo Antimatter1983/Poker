@@ -1,0 +1,32 @@
+{% extends 'web/base.html' %}
+{% block title %}{{ lobby.title }}{% endblock %}
+{% block content %}
+<section class="card tournament-head">
+  <div><p class="eyebrow">Код: {{ lobby.code }}</p><h1>{{ lobby.title }}</h1><p>Статус: <strong>{{ lobby.status }}</strong> · Раздача {{ lobby.game.hand_number|default:0 }} из {{ lobby.hand_count }}</p></div>
+  <a class="button" href="{% url 'web:leaderboard' lobby.code %}">Таблица лидеров</a>
+</section>
+{% if lobby.status == 'waiting' %}
+<section class="grid two">
+  <form class="card stack" method="post" action="{% url 'web:join_tournament' lobby.code %}">{% csrf_token %}<h2>Регистрация игрока</h2><label>Ваше имя <input name="name" value="{{ player_name|default:'' }}" placeholder="Alice"></label><button class="primary">Зарегистрироваться</button></form>
+  <form class="card stack" method="post" action="{% url 'web:start_tournament' lobby.code %}">{% csrf_token %}<h2>Старт</h2><p>Игроки: {{ lobby.player_names|join:', ' }}</p><button class="danger">Начать турнир</button></form>
+</section>
+{% elif table %}
+<section class="table card">
+  <div class="stats"><span>Стек: <strong>{{ table.player.stack }}</strong></span><span>Банк: <strong>{{ engine.pot }}</strong></span><span>Улица: <strong>{{ engine.street }}</strong></span></div>
+  <div class="felt">
+    <div><span class="label">Ваши карты</span><div class="cards">{{ hole_cards }}</div></div>
+    <div><span class="label">Борд</span><div class="cards board">{{ board }}</div></div>
+    <div><span class="label">Call Bot</span><div class="cards">{{ bot_cards }}</div></div>
+  </div>
+  {% if legal_actions %}
+  <form class="actions" method="post" action="{% url 'web:submit_action' lobby.code %}">{% csrf_token %}
+    <select name="action">{% for action,label in legal_actions %}<option value="{{ action }}">{{ label }}</option>{% endfor %}</select>
+    <input name="amount" type="number" min="1" placeholder="Сумма для bet/raise">
+    <button class="primary">Сделать ход</button>
+  </form>
+  {% elif lobby.status == 'finished' %}<p class="notice">Турнир завершён.</p>{% else %}<p class="notice">Ожидание действий других столов или следующей раздачи. Обновите страницу.</p>{% endif %}
+</section>
+{% else %}
+<section class="card"><h2>Турнир уже идёт</h2><p>Вы не зарегистрированы в этом турнире.</p></section>
+{% endif %}
+{% endblock %}

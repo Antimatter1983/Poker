@@ -1,0 +1,9 @@
+{% extends 'web/base.html' %}
+{% block title %}Лидеры {{ lobby.title }}{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">{{ lobby.title }}</p><h1>Таблица лидеров по фишкам</h1>
+  <ol class="leaderboard">{% for name, stack in lobby.standings %}<li><span>{{ name }}</span><strong>{{ stack }}</strong></li>{% endfor %}</ol>
+  <a class="button" href="{% url 'web:tournament_detail' lobby.code %}">Вернуться к столу</a>
+</section>
+{% endblock %}
