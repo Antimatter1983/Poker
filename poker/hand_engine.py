@@ -1,3 +1,5 @@
+from time import monotonic
+
 from .deck import Deck
 from .player import Player
 from .hand_evaluator import HandEvaluator, HandValue
@@ -27,6 +29,7 @@ class HandEngine:
         self.last_aggressor: str | None = None
         self.returned_chips = 0
         self.starting_stacks: dict[str, int] = {}
+        self.finished_at: float | None = None
 
     @property
     def small_blind_player(self):
@@ -45,7 +48,7 @@ class HandEngine:
             self.deck.cards = list(deck_cards)
         self.community_cards = []
         self.pot = 0; self.street = PREFLOP; self.current_bet = self.big_blind; self.min_raise = self.big_blind
-        self.finished = False; self.winners = []; self.hand_values = {}; self.finish_reason = None; self.returned_chips = 0
+        self.finished = False; self.winners = []; self.hand_values = {}; self.finish_reason = None; self.returned_chips = 0; self.finished_at = None
         self.starting_stacks = {p.player_id: p.stack for p in self.players}
         for p in self.players: p.reset_for_new_hand()
         self.pot += self.small_blind_player.commit_chips(self.small_blind)
@@ -190,13 +193,13 @@ class HandEngine:
         else:
             self.winners = active[:]
         self._award_pot()
-        self.finish_reason = "showdown"; self.street = FINISHED; self.finished = True
+        self.finish_reason = "showdown"; self.street = FINISHED; self.finished = True; self.finished_at = monotonic()
 
     def _fold(self, p):
         p.folded = True; p.last_action = FOLD
         self._return_uncalled()
         winner = self._other(p); self.winners = [winner]; winner.stack += self.pot; self.pot = 0
-        self.finish_reason = "fold"; self.street = FINISHED; self.finished = True
+        self.finish_reason = "fold"; self.street = FINISHED; self.finished = True; self.finished_at = monotonic()
 
     def _return_uncalled(self):
         a, b = self.players

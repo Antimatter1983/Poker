@@ -55,8 +55,12 @@ def tournament_detail(request: HttpRequest, code: str):
         "legal_actions": game_store.legal_action_options(engine) if player_turn else [],
         "betting_buttons": game_store.betting_buttons(engine, table.player) if player_turn else [],
         "result": game_store.hand_result(engine, table.player.player_id if table else None),
+        "hero_hand_summary": game_store.current_hand_summary((table.player.cards if table else []) + (engine.community_cards if engine else [])),
+        "bot_hand_summary": game_store.current_hand_summary((table.bot.cards if table and engine and engine.finished else []) + (engine.community_cards if engine else [])),
         "race_standings": lobby.race_standings(),
         "can_advance_hand": lobby.can_advance_hand(),
+        "player_can_advance_hand": lobby.player_can_advance_hand(player_name),
+        "next_hand_actor_name": lobby.next_hand_actor_name,
         "final_hand_ready": bool(lobby.game and lobby.game.hand_number >= lobby.hand_count and lobby.can_advance_hand()),
         "next_hand_wait_seconds": next_hand_wait_seconds,
         "action_timer_seconds": lobby.game.seconds_to_action_deadline() if lobby.game else None,
@@ -98,9 +102,12 @@ def next_hand(request: HttpRequest, code: str):
     try:
         if lobby.status == game_store.FINISHED:
             raise ValueError("Турнир уже завершён")
+        player_name = request.session.get(f"player:{code}")
         if not lobby.can_advance_hand():
             waiting = ", ".join(lobby.unfinished_player_names()) or "другие игроки"
             raise ValueError(f"Игроки {waiting} ещё играют раздачу. Ждите.")
+        if not lobby.player_can_advance_hand(player_name):
+            raise ValueError("Кнопка следующей раздачи доступна только игроку, который завершил раздачу последним. Остальные столы обновятся автоматически.")
         lobby.advance_finished_hands(force=True)
         if lobby.status == game_store.FINISHED:
             messages.success(request, "Турнир завершён")
