@@ -16,7 +16,7 @@ from poker.tournament import HAND_COUNT, Tournament
 WAITING = "waiting"
 RUNNING = "running"
 FINISHED = "finished"
-HAND_RESULT_PAUSE_SECONDS = 5
+HAND_RESULT_PAUSE_SECONDS = 15
 
 
 @dataclass
@@ -29,6 +29,7 @@ class LobbyTournament:
     status: str = WAITING
     game: Tournament | None = None
     finished_hand_at: float | None = None
+    next_hand_actor_name: str | None = None
 
     def add_player(self, name: str) -> None:
         name = name.strip()
@@ -53,6 +54,7 @@ class LobbyTournament:
         )
         self.status = RUNNING
         self.finished_hand_at = None
+        self.next_hand_actor_name = None
         self.game.start_next_hand()
 
     def finish(self) -> None:
@@ -71,19 +73,35 @@ class LobbyTournament:
         self.game.process_timeouts()
         if not self.all_hands_finished():
             self.finished_hand_at = None
+            self.next_hand_actor_name = None
             return
         if self.finished_hand_at is None:
             self.finished_hand_at = monotonic()
-        if not force:
+            self.next_hand_actor_name = self._latest_finished_player_name()
+        if not force and self.seconds_until_next_hand_ready() > 0:
             return
         if self.game.hand_number >= self.game.hand_count:
             self.status = FINISHED
             return
         self.finished_hand_at = None
+        self.next_hand_actor_name = None
         self.game.start_next_hand()
 
     def all_hands_finished(self) -> bool:
         return bool(self.game and self.game.tables and all(table.engine.finished for table in self.game.tables))
+
+    def player_can_advance_hand(self, player_name: str | None) -> bool:
+        return bool(player_name and self.can_advance_hand() and player_name == self.next_hand_actor_name)
+
+    def _latest_finished_player_name(self) -> str | None:
+        if self.game is None:
+            return None
+        latest_table = max(
+            self.game.tables,
+            key=lambda table: table.engine.finished_at or 0,
+            default=None,
+        )
+        return latest_table.player.player_id if latest_table else None
 
     def seconds_until_next_hand_ready(self) -> int:
         if not self.all_hands_finished():
@@ -215,3 +233,27 @@ def betting_buttons(engine: HandEngine | None, player) -> list[dict[str, int | s
 def legal_action_options(engine: HandEngine) -> list[tuple[str, str]]:
     labels = {FOLD: "Fold", CHECK: "Check", CALL: "Call", BET: "Bet", RAISE: "Raise", ALL_IN: "All-in"}
     return [(action, labels[action]) for action in engine.legal_actions()]
+
+
+def current_hand_summary(cards) -> str:
+    cards = list(cards)
+    if len(cards) < 2:
+        return "—"
+    from itertools import combinations
+    from poker.hand_evaluator import HAND_NAMES, _evaluate_five
+    if len(cards) >= 5:
+        value = max((_evaluate_five(tuple(combo)) for combo in combinations(cards, 5)), key=lambda h: h._key())
+        return value.name
+    counts = {}
+    for card in cards:
+        counts[card.value] = counts.get(card.value, 0) + 1
+    if 4 in counts.values():
+        return HAND_NAMES[8]
+    if 3 in counts.values():
+        return HAND_NAMES[4]
+    pairs = sum(1 for count in counts.values() if count == 2)
+    if pairs >= 2:
+        return HAND_NAMES[3]
+    if pairs == 1:
+        return HAND_NAMES[2]
+    return HAND_NAMES[1]
