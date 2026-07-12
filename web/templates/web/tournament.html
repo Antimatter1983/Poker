@@ -1,6 +1,7 @@
 {% extends 'web/base.html' %}
 {% block title %}{{ lobby.title }}{% endblock %}
 {% block body_class %}{% if table %}play-screen{% endif %}{% endblock %}
+{% block head_extra %}{% if next_hand_wait_seconds != None %}<meta http-equiv="refresh" content="{{ next_hand_wait_seconds|default:1 }}">{% endif %}{% endblock %}
 {% block content %}
 {% if lobby.status == 'waiting' %}
 <section class="card tournament-head compact-head">
@@ -38,7 +39,7 @@
     </form>
     {% if betting_buttons %}<form class="raise-actions" method="post" action="{% url 'web:submit_action' lobby.code %}">{% csrf_token %}<input type="hidden" name="action" value="{{ betting_buttons.0.action }}">{% for option in betting_buttons %}<button name="amount" value="{{ option.amount }}"><span>{{ option.label }}</span><strong>{{ option.amount }}</strong></button>{% endfor %}</form>{% endif %}
   </div>
-  {% elif lobby.status == 'finished' %}<p class="notice">Игра завершена. Вернитесь в лобби и создайте новую.</p>{% else %}<div class="next-hand-panel"><form method="post" action="{% url 'web:next_hand' lobby.code %}">{% csrf_token %}<button class="primary" {% if not can_advance_hand %}disabled{% endif %}>{% if final_hand_ready %}Завершить турнир{% else %}Следующая раздача{% endif %}</button></form><p class="notice">{% if can_advance_hand %}{% if final_hand_ready %}Все игроки завершили последнюю раздачу. Нажмите, чтобы увидеть итог.{% else %}Все игроки завершили раздачу. Нажмите, чтобы обновить стол.{% endif %}{% else %}Кнопка станет активной, когда все игроки сделают последние ходы.{% endif %}</p></div>{% endif %}
+  {% elif lobby.status == 'finished' %}<p class="notice">Игра завершена. Вернитесь в лобби и создайте новую.</p>{% else %}<div class="next-hand-panel"><form method="post" action="{% url 'web:next_hand' lobby.code %}">{% csrf_token %}<button class="primary" {% if not can_advance_hand %}disabled{% endif %}>{% if final_hand_ready %}Завершить турнир{% else %}Следующая раздача{% endif %}</button></form><p class="notice">{% if can_advance_hand %}{% if final_hand_ready %}Все игроки завершили последнюю раздачу. Нажмите, чтобы увидеть итог.{% else %}Все игроки завершили раздачу. Нажмите, чтобы обновить стол.{% endif %}{% else %}{% if next_hand_wait_seconds != None %}Следующая раздача откроется через {{ next_hand_wait_seconds }} сек.{% else %}Кнопка станет активной, когда все игроки сделают последние ходы.{% endif %}{% endif %}</p></div>{% endif %}
 </section>
 {% else %}
 <section class="card"><h2>Игра уже идёт</h2><p>Вы не зарегистрированы в этой игре.</p><a class="button primary" href="{% url 'web:home' %}">Вернуться в лобби</a></section>

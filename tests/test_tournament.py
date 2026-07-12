@@ -74,3 +74,48 @@ def test_standings_and_winner_after_configured_hands():
 
     assert tournament.hand_number == 1
     assert len(tournament.winner_ids()) >= 1
+
+
+def finish_player_hand(tournament, player_id):
+    table = next(table for table in tournament.tables if table.player.player_id == player_id)
+    while not table.engine.finished:
+        action = CALL if CALL in table.engine.legal_actions(table.player) else CHECK
+        tournament.submit_player_action(player_id, action)
+
+
+def test_lobby_next_hand_waits_five_seconds_after_all_tables_finish(monkeypatch):
+    from web import game_store
+
+    now = 100.0
+    monkeypatch.setattr(game_store, "monotonic", lambda: now)
+    lobby = game_store.LobbyTournament("code", "Daily", "admin", hand_count=2, player_names=["alice"])
+    lobby.start()
+    finish_player_hand(lobby.game, "alice")
+    assert lobby.all_hands_finished()
+
+    lobby.advance_finished_hands()
+    assert lobby.game.hand_number == 1
+    assert not lobby.can_advance_hand()
+    assert lobby.seconds_until_next_hand_ready() == 5
+
+    now = 104.9
+    assert not lobby.can_advance_hand()
+    assert lobby.game.hand_number == 1
+
+    now = 105.0
+    assert lobby.can_advance_hand()
+    lobby.advance_finished_hands()
+    assert lobby.game.hand_number == 2
+    assert not lobby.game.tables[0].engine.finished
+
+
+def test_finished_table_does_not_offer_player_actions():
+    from web import game_store
+
+    lobby = game_store.LobbyTournament("code", "Daily", "admin", hand_count=2, player_names=["alice"])
+    lobby.start()
+    table = lobby.table_for("alice")
+    finish_player_hand(lobby.game, "alice")
+
+    assert table.engine.finished
+    assert game_store.legal_action_options(table.engine) == []

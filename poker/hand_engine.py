@@ -57,6 +57,8 @@ class HandEngine:
         self.pending = {p.player_id for p in self.players if p.can_act()}
 
     def legal_actions(self, player: Player | None = None) -> list[str]:
+        if self.finished:
+            return []
         p = player or self.current_player
         if not p or not p.can_act(): return []
         to_call = self.to_call(p)
