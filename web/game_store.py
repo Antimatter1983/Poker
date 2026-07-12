@@ -68,13 +68,13 @@ class LobbyTournament:
     def advance_finished_hands(self, force: bool = False) -> None:
         if self.game is None or self.status != RUNNING:
             return
+        self.game.process_timeouts()
         if not self.all_hands_finished():
             self.finished_hand_at = None
             return
         if self.finished_hand_at is None:
             self.finished_hand_at = monotonic()
-            return
-        if not force and self.seconds_until_next_hand_ready() > 0:
+        if not force:
             return
         if self.game.hand_number >= self.game.hand_count:
             self.status = FINISHED
@@ -95,7 +95,12 @@ class LobbyTournament:
         return max(0, int(HAND_RESULT_PAUSE_SECONDS - elapsed + 0.999))
 
     def can_advance_hand(self) -> bool:
-        return self.status == RUNNING and self.game is not None and self.all_hands_finished() and self.seconds_until_next_hand_ready() == 0
+        return self.status == RUNNING and self.game is not None and self.all_hands_finished()
+
+    def unfinished_player_names(self) -> list[str]:
+        if self.game is None:
+            return []
+        return [table.player.player_id for table in self.game.tables if not table.engine.finished]
 
     def standings(self) -> list[tuple[str, int]]:
         if self.game is None:
@@ -201,8 +206,9 @@ def betting_buttons(engine: HandEngine | None, player) -> list[dict[str, int | s
     if action is None or maximum is None:
         return []
     minimum = engine.big_blind if action == BET else engine.current_bet + engine.min_raise
-    medium = minimum + (maximum - minimum) // 2
-    labels = [("Минимум", minimum), ("Средний", medium), ("Максимум", maximum)]
+    half_pot = player.street_bet + engine.to_call(player) + engine.pot // 2
+    medium = min(maximum, max(minimum, half_pot))
+    labels = [("Мин 2ББ", minimum), ("1/2 пота", medium), ("Пот", maximum)]
     return [{"label": label, "action": action, "amount": amount} for label, amount in labels]
 
 
