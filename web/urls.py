@@ -9,5 +9,6 @@ urlpatterns = [
     path("tournaments/<slug:code>/join/", views.join_tournament, name="join_tournament"),
     path("tournaments/<slug:code>/start/", views.start_tournament, name="start_tournament"),
     path("tournaments/<slug:code>/action/", views.submit_action, name="submit_action"),
+    path("tournaments/<slug:code>/finish/", views.finish_tournament, name="finish_tournament"),
     path("tournaments/<slug:code>/leaderboard/", views.leaderboard, name="leaderboard"),
 ]

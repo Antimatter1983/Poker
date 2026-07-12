@@ -41,15 +41,19 @@ def tournament_detail(request: HttpRequest, code: str):
     lobby.advance_finished_hands()
     table = lobby.table_for(player_name) if player_name else None
     engine = table.engine if table else None
+    player_turn = bool(engine and table and engine.current_player is table.player)
     context = {
         "lobby": lobby,
         "player_name": player_name,
         "table": table,
         "engine": engine,
-        "hole_cards": game_store.card_text(table.player.cards) if table else "—",
-        "bot_cards": game_store.card_text(table.bot.cards) if table and engine and engine.finished else "Скрыты",
-        "board": game_store.card_text(engine.community_cards) if engine else "—",
-        "legal_actions": game_store.legal_action_options(engine) if engine and engine.current_player is table.player else [],
+        "hole_cards": game_store.card_view(table.player.cards) if table else [],
+        "bot_cards": game_store.card_view(table.bot.cards) if table and engine and engine.finished else [],
+        "bot_hidden": not (table and engine and engine.finished),
+        "board": game_store.card_view(engine.community_cards) if engine else [],
+        "legal_actions": game_store.legal_action_options(engine) if player_turn else [],
+        "betting_buttons": game_store.betting_buttons(engine, table.player) if player_turn else [],
+        "result": game_store.hand_result(engine),
     }
     return render(request, "web/tournament.html", context)
 
@@ -103,3 +107,14 @@ def leaderboard(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
     lobby.advance_finished_hands()
     return render(request, "web/leaderboard.html", {"lobby": lobby})
+
+
+@require_POST
+def finish_tournament(request: HttpRequest, code: str):
+    lobby = _lobby_or_404(code)
+    try:
+        lobby.finish()
+        messages.success(request, "Турнир завершён")
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    return redirect("web:leaderboard", code=code)
