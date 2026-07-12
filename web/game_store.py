@@ -82,10 +82,33 @@ class LobbyTournament:
         self.finished_hand_at = None
         self.game.start_next_hand()
 
+    def all_hands_finished(self) -> bool:
+        return bool(self.game and self.game.tables and all(table.engine.finished for table in self.game.tables))
+
+    def can_advance_hand(self) -> bool:
+        return self.status == RUNNING and self.all_hands_finished() and self.game is not None
+
     def standings(self) -> list[tuple[str, int]]:
         if self.game is None:
             return [(name, 1000) for name in self.player_names]
         return self.game.standings()
+
+    def race_standings(self) -> list[dict[str, int | str]]:
+        standings = self.standings()
+        if not standings:
+            return []
+        stacks = [stack for _, stack in standings]
+        min_stack = min(stacks)
+        max_stack = max(stacks)
+        spread = max(max_stack - min_stack, 1)
+        return [
+            {
+                "name": name,
+                "stack": stack,
+                "position": 8 + round(((stack - min_stack) / spread) * 84),
+            }
+            for name, stack in standings
+        ]
 
 
 TOURNAMENTS: dict[str, LobbyTournament] = {}
@@ -138,15 +161,16 @@ def hand_result(engine: HandEngine | None, player_id: str | None = None) -> dict
     player_hand = player_value.name if player_value else "fold"
     bot_hand = bot_value.name if bot_value else "fold"
 
+    player_label = player.player_id
     if split:
         verdict = "Ничья"
-        summary = f"Игрок вернул {amount} с {player_hand} против {bot_hand}"
+        summary = f"{player_label} вернул(а) {amount} с {player_hand} против {bot_hand}"
     elif player_won:
-        verdict = "Игрок выиграл"
-        summary = f"Игрок выиграл {amount} с {player_hand} против {bot_hand}"
+        verdict = f"{player_label} выиграл(а)"
+        summary = f"{player_label} выиграл(а) {amount} с {player_hand} против {bot_hand}"
     else:
-        verdict = "Игрок проиграл"
-        summary = f"Игрок проиграл {amount} с {player_hand} против {bot_hand}"
+        verdict = f"{player_label} проиграл(а)"
+        summary = f"{player_label} проиграл(а) {amount} с {player_hand} против {bot_hand}"
 
     return {
         "player_won": player_won,
