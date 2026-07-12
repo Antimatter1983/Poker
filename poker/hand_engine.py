@@ -26,6 +26,7 @@ class HandEngine:
         self.pending: set[str] = set()
         self.last_aggressor: str | None = None
         self.returned_chips = 0
+        self.starting_stacks: dict[str, int] = {}
 
     @property
     def small_blind_player(self):
@@ -45,6 +46,7 @@ class HandEngine:
         self.community_cards = []
         self.pot = 0; self.street = PREFLOP; self.current_bet = self.big_blind; self.min_raise = self.big_blind
         self.finished = False; self.winners = []; self.hand_values = {}; self.finish_reason = None; self.returned_chips = 0
+        self.starting_stacks = {p.player_id: p.stack for p in self.players}
         for p in self.players: p.reset_for_new_hand()
         self.pot += self.small_blind_player.commit_chips(self.small_blind)
         self.pot += self.big_blind_player.commit_chips(self.big_blind)

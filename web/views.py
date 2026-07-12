@@ -53,7 +53,7 @@ def tournament_detail(request: HttpRequest, code: str):
         "board": game_store.card_view(engine.community_cards) if engine else [],
         "legal_actions": game_store.legal_action_options(engine) if player_turn else [],
         "betting_buttons": game_store.betting_buttons(engine, table.player) if player_turn else [],
-        "result": game_store.hand_result(engine),
+        "result": game_store.hand_result(engine, table.player.player_id if table else None),
     }
     return render(request, "web/tournament.html", context)
 
@@ -94,6 +94,8 @@ def submit_action(request: HttpRequest, code: str):
     amount_raw = request.POST.get("amount", "").strip()
     try:
         amount = int(amount_raw) if amount_raw else None
+        if lobby.status == game_store.FINISHED:
+            raise ValueError("Турнир завершён. Создайте новый турнир, чтобы играть снова")
         if lobby.game is None:
             raise ValueError("Турнир ещё не начался")
         lobby.game.submit_player_action(player_name, action, amount)

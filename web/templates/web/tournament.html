@@ -1,17 +1,16 @@
 {% extends 'web/base.html' %}
 {% block title %}{{ lobby.title }}{% endblock %}
 {% block content %}
-<section class="card tournament-head">
+<section class="card tournament-head compact-head">
   <div>
     <p class="eyebrow">Код: {{ lobby.code }}</p>
     <h1>{{ lobby.title }}</h1>
     <p>Статус: <strong>{{ lobby.status }}</strong> · Раздача {{ lobby.game.hand_number|default:0 }} из {{ lobby.hand_count }}</p>
   </div>
   <div class="head-actions">
-    <a class="button secondary" href="{% url 'web:leaderboard' lobby.code %}">Таблица лидеров</a>
-    {% if lobby.status == 'running' %}
-    <form method="post" action="{% url 'web:finish_tournament' lobby.code %}">{% csrf_token %}<button class="danger">Завершить турнир</button></form>
-    {% endif %}
+    <a class="button secondary" href="{% url 'web:home' %}">Лобби</a>
+    {% if lobby.status == 'finished' %}<a class="button primary" href="{% url 'web:home' %}">Создать новый турнир</a>{% endif %}
+    {% if lobby.status == 'running' %}<form method="post" action="{% url 'web:finish_tournament' lobby.code %}">{% csrf_token %}<button class="danger">Завершить турнир</button></form>{% endif %}
   </div>
 </section>
 {% if lobby.status == 'waiting' %}
@@ -20,24 +19,23 @@
   <form class="card stack" method="post" action="{% url 'web:start_tournament' lobby.code %}">{% csrf_token %}<h2>Старт</h2><p>Игроки: {{ lobby.player_names|join:', ' }}</p><button class="danger">Начать турнир</button></form>
 </section>
 {% elif table %}
-<section class="table card">
-  <div class="stats"><span>Стек: <strong>{{ table.player.stack }}</strong></span><span>Банк: <strong>{{ engine.pot }}</strong></span><span>Улица: <strong>{{ engine.street }}</strong></span></div>
-  <div class="felt">
-    <div class="seat opponent"><span class="label">Call Bot</span><div class="playing-cards">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div></div>
-    <div class="community"><span class="label">Борд</span><div class="playing-cards board-cards">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Карты борда появятся здесь</span>{% endfor %}</div></div>
-    <div class="seat hero-seat"><span class="label">Ваши карты</span><div class="playing-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+<section class="table card play-only">
+  <div class="felt minimal-felt">
+    <div class="seat opponent"><span class="label">Карты дилера</span><div class="playing-cards">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div></div>
+    <div class="community"><span class="label">Карты борда</span><div class="playing-cards board-cards">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Борд пуст</span>{% endfor %}</div></div>
+    <div class="seat hero-seat"><span class="label">Карты игрока</span><div class="playing-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
   </div>
-  {% if result %}<div class="result-banner"><strong>Победитель: {{ result.winner }}</strong><span>{{ result.hand }} · выигрыш: {{ result.gain }}</span><small>Следующая раздача начнётся после короткой паузы — успейте посмотреть результат.</small></div>{% endif %}
-  {% if legal_actions %}
+  {% if result %}<div class="result-banner {% if result.player_won %}win{% elif result.split %}split{% else %}loss{% endif %}"><strong>{{ result.verdict }}</strong><span>{{ result.summary }}</span><small>Комбинация игрока: {{ result.player_hand }} · комбинация бота: {{ result.bot_hand }}</small>{% if lobby.status == 'finished' %}<a class="button primary" href="{% url 'web:home' %}">Вернуться к созданию турниров</a>{% endif %}</div>{% endif %}
+  {% if legal_actions and lobby.status != 'finished' %}
   <div class="action-panel">
     <form class="quick-actions" method="post" action="{% url 'web:submit_action' lobby.code %}">{% csrf_token %}
       {% for action,label in legal_actions %}{% if action == 'FOLD' or action == 'CHECK' or action == 'CALL' %}<button name="action" value="{{ action }}" class="{% if action == 'FOLD' %}danger{% else %}primary{% endif %}">{{ label }}</button>{% endif %}{% endfor %}
     </form>
     {% if betting_buttons %}<form class="raise-actions" method="post" action="{% url 'web:submit_action' lobby.code %}">{% csrf_token %}<input type="hidden" name="action" value="{{ betting_buttons.0.action }}">{% for option in betting_buttons %}<button name="amount" value="{{ option.amount }}"><span>{{ option.label }}</span><strong>{{ option.amount }}</strong></button>{% endfor %}</form>{% endif %}
   </div>
-  {% elif lobby.status == 'finished' %}<p class="notice">Турнир завершён. Откройте таблицу лидеров, чтобы увидеть итог.</p>{% else %}<p class="notice">Ожидание действий других столов или следующей раздачи. Обновите страницу.</p>{% endif %}
+  {% elif lobby.status == 'finished' %}<p class="notice">Турнир завершён. В этом турнире больше нельзя играть — вернитесь в лобби и создайте новый.</p>{% else %}<p class="notice">Ожидание следующего действия или новой раздачи. Обновите страницу.</p>{% endif %}
 </section>
 {% else %}
-<section class="card"><h2>Турнир уже идёт</h2><p>Вы не зарегистрированы в этом турнире.</p></section>
+<section class="card"><h2>Турнир уже идёт</h2><p>Вы не зарегистрированы в этом турнире.</p><a class="button primary" href="{% url 'web:home' %}">Вернуться к созданию турниров</a></section>
 {% endif %}
 {% endblock %}

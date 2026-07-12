@@ -120,15 +120,43 @@ def card_view(cards) -> list[dict[str, str | bool]]:
     ]
 
 
-def hand_result(engine: HandEngine | None) -> dict[str, str] | None:
-    if engine is None or not engine.finished or not engine.winners:
+def hand_result(engine: HandEngine | None, player_id: str | None = None) -> dict[str, str | bool | int] | None:
+    if engine is None or player_id is None or not engine.finished or not engine.winners:
         return None
-    winners = ", ".join(winner.player_id.replace("bot:", "Call Bot для ") for winner in engine.winners)
-    if engine.finish_reason == "fold":
-        return {"winner": winners, "hand": "победа после fold", "gain": "банк раздачи"}
-    values = [engine.hand_values.get(winner.player_id) for winner in engine.winners]
-    hand = ", ".join(value.name for value in values if value)
-    return {"winner": winners, "hand": hand or "лучшая рука", "gain": "банк раздачи"}
+    player = next((candidate for candidate in engine.players if candidate.player_id == player_id), None)
+    bot = next((candidate for candidate in engine.players if candidate.player_id != player_id), None)
+    if player is None or bot is None:
+        return None
+
+    player_won = any(winner.player_id == player_id for winner in engine.winners)
+    split = len(engine.winners) > 1
+    start_stack = engine.starting_stacks.get(player_id, player.stack)
+    net = player.stack - start_stack
+    amount = abs(net)
+    player_value = engine.hand_values.get(player.player_id)
+    bot_value = engine.hand_values.get(bot.player_id)
+    player_hand = player_value.name if player_value else "fold"
+    bot_hand = bot_value.name if bot_value else "fold"
+
+    if split:
+        verdict = "Ничья"
+        summary = f"Игрок вернул {amount} с {player_hand} против {bot_hand}"
+    elif player_won:
+        verdict = "Игрок выиграл"
+        summary = f"Игрок выиграл {amount} с {player_hand} против {bot_hand}"
+    else:
+        verdict = "Игрок проиграл"
+        summary = f"Игрок проиграл {amount} с {player_hand} против {bot_hand}"
+
+    return {
+        "player_won": player_won,
+        "split": split,
+        "verdict": verdict,
+        "amount": amount,
+        "player_hand": player_hand,
+        "bot_hand": bot_hand,
+        "summary": summary,
+    }
 
 
 def betting_buttons(engine: HandEngine | None, player) -> list[dict[str, int | str]]:
