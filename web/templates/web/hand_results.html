@@ -1,0 +1,38 @@
+{% extends 'web/base.html' %}
+{% block title %}Раскрытие · {{ lobby.title }}{% endblock %}
+{% block content %}
+<section class="card stack" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
+  <p class="eyebrow">Общая раздача №{{ completed_hand_number }} · {{ common_hand_status }}</p>
+  <h1>Общее раскрытие</h1>
+  <p>Следующая раздача через <strong data-seconds-left>{{ seconds_left }}</strong> секунд</p>
+</section>
+<section class="card stack">
+  <h2>Таблица результатов</h2>
+  <table>
+    <thead><tr><th>Игрок</th><th>Карты игрока</th><th>Карты бота</th><th>Борд</th><th>Комбинация игрока</th><th>Комбинация бота</th><th>Победитель</th><th>Итог</th></tr></thead>
+    <tbody>{% for row in results %}<tr>
+      <td>{{ row.player_name }}</td>
+      <td>{% for card in row.player_cards %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
+      <td>{% for card in row.bot_cards %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
+      <td>{% for card in row.board %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
+      <td>{{ row.player_hand }}</td><td>{{ row.bot_hand }}</td><td>{{ row.winner }}</td><td>{{ row.net }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</section>
+<script>
+(function(){
+  const box = document.querySelector('[data-reveal-status-url]');
+  const seconds = document.querySelector('[data-seconds-left]');
+  async function poll(){
+    try {
+      const response = await fetch(box.dataset.revealStatusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.status === 'next_hand' && data.url) window.location.href = data.url;
+      if (data.seconds_left !== undefined && seconds) seconds.textContent = data.seconds_left;
+    } catch (e) { console.warn('Reveal polling failed', e); }
+  }
+  setInterval(poll, 1500); poll();
+})();
+</script>
+{% endblock %}
