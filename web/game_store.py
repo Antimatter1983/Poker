@@ -25,7 +25,7 @@ FINISHED = "finished"
 HAND_PLAYING = "PLAYING"
 HAND_WAITING = "WAITING"
 HAND_REVEAL = "REVEAL"
-REVEAL_SECONDS = 15
+REVEAL_SECONDS = 10
 HAND_RESULT_PAUSE_SECONDS = REVEAL_SECONDS
 
 
@@ -276,7 +276,12 @@ def card_view(cards) -> list[dict[str, str | bool]]:
     red_suits = {"H", "D"}
     rank_labels = {"T": "10"}
     return [
-        {"rank": rank_labels.get(card.rank, card.rank), "suit": suit_symbols[card.suit], "red": card.suit in red_suits}
+        {
+            "rank": rank_labels.get(card.rank, card.rank),
+            "suit": suit_symbols[card.suit],
+            "red": card.suit in red_suits,
+            "code": str(card),
+        }
         for card in cards
     ]
 

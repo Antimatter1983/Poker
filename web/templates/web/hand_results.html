@@ -24,14 +24,36 @@
         </div>
       </div>
 
-      <div class="best-combos">
-        <div class="combo-row player-combo">
-          <div><span class="label">Лучшая комбинация {{ hero_result.player_name }}</span><strong>{{ hero_result.player_hand }}</strong></div>
-          <div class="playing-cards mini-cards best-cards" aria-label="Пять лучших карт игрока {{ hero_result.player_name }}">{% for card in hero_result.player_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+      <div class="showdown-combo-viewer" data-showdown-combos>
+        <div class="combo-status" aria-live="polite">
+          <span class="label">Сейчас показано</span>
+          <strong data-active-combo>Все карты без выделения</strong>
         </div>
-        <div class="combo-row bot-combo">
-          <div><span class="label">Лучшая комбинация Бота</span><strong aria-label="Комбинация бота">{{ hero_result.bot_hand }}</strong></div>
-          <div class="playing-cards mini-cards best-cards" aria-label="Карты бота: пять лучших карт">{% for card in hero_result.bot_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+
+        <div class="showdown-table-cards" aria-label="Карты showdown">
+          <div class="showdown-card-group player-hole-cards">
+            <span class="label">Карманные карты {{ hero_result.player_name }}</span>
+            <div class="playing-cards mini-cards">
+              {% for card in hero_result.player_cards %}<span class="poker-card showdown-card {% if card.red %}red{% endif %}" data-card="{{ card.code }}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}
+            </div>
+          </div>
+          <div class="showdown-card-group board-cards-group">
+            <span class="label">Борд</span>
+            <div class="playing-cards board-cards">
+              {% for card in hero_result.board %}<span class="poker-card showdown-card {% if card.red %}red{% endif %}" data-card="{{ card.code }}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}
+            </div>
+          </div>
+          <div class="showdown-card-group bot-hole-cards">
+            <span class="label">Карты бота</span>
+            <div class="playing-cards mini-cards">
+              {% for card in hero_result.bot_cards %}<span class="poker-card showdown-card {% if card.red %}red{% endif %}" data-card="{{ card.code }}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="combo-controls" aria-label="Переключение подсветки комбинаций">
+          <button type="button" data-combo-button="player" data-combo-name="{{ hero_result.player_hand }}" data-best-cards="{% for card in hero_result.player_best_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация игрока</button>
+          <button type="button" data-combo-button="bot" data-combo-name="{{ hero_result.bot_hand }}" data-best-cards="{% for card in hero_result.bot_best_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация бота</button>
         </div>
       </div>
     </article>
@@ -58,6 +80,33 @@
     } catch (e) { console.warn('Showdown polling failed', e); }
   }
   setInterval(poll, 1500); poll();
+})();
+
+(function(){
+  const viewer = document.querySelector('[data-showdown-combos]');
+  if (!viewer) return;
+  const cards = Array.from(viewer.querySelectorAll('[data-card]'));
+  const status = viewer.querySelector('[data-active-combo]');
+  const buttons = Array.from(viewer.querySelectorAll('[data-combo-button]'));
+
+  function clearSelection(){
+    cards.forEach(card => card.classList.remove('highlight', 'dimmed'));
+    buttons.forEach(button => button.classList.remove('active'));
+  }
+
+  function showCombo(type){
+    const button = viewer.querySelector(`[data-combo-button="${type}"]`);
+    if (!button) return;
+    const bestCards = new Set((button.dataset.bestCards || '').split(/\s+/).filter(Boolean));
+    clearSelection();
+    cards.forEach(card => card.classList.add(bestCards.has(card.dataset.card) ? 'highlight' : 'dimmed'));
+    button.classList.add('active');
+    if (status) status.textContent = `${button.textContent}: ${button.dataset.comboName || '—'}`;
+  }
+
+  buttons.forEach(button => button.addEventListener('click', () => showCombo(button.dataset.comboButton)));
+  window.setTimeout(() => showCombo('player'), 1000);
+  window.setTimeout(() => showCombo('bot'), 4000);
 })();
 </script>
 {% endblock %}
