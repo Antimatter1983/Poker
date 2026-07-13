@@ -278,8 +278,8 @@ RANK_NAMES_RU_PLURAL = {
     5: "пятёрок", 4: "четвёрок", 3: "троек", 2: "двоек",
 }
 HAND_NAMES_RU = {
-    1: "старшая карта", 2: "пара", 3: "две пары", 4: "тройка",
-    5: "стрит", 6: "флеш", 7: "фулл-хаус", 8: "каре", 9: "стрит-флеш",
+    1: "старшая карта", 2: "пара", 3: "две пары", 4: "три карты",
+    5: "стрит", 6: "флэш", 7: "фуллхаус", 8: "каре", 9: "стрит флэш",
 }
 
 
@@ -335,29 +335,21 @@ def _kicker_values(value, important_kicker_values: set[int] | None = None) -> se
 def _hand_description(value, important_kicker_values: set[int]) -> str:
     if not value:
         return "фолд"
-    if value.rank == 1:
-        text = f"старшая карта {RANK_NAMES_RU[value.tiebreakers[0]]}"
-    elif value.rank == 2:
-        text = f"пара {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
-    elif value.rank == 3:
-        text = f"две пары: {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]} и {RANK_NAMES_RU_PLURAL[value.tiebreakers[1]]}"
-    elif value.rank == 4:
-        text = f"тройка {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
-    elif value.rank == 7:
-        text = f"фулл-хаус: {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]} и {RANK_NAMES_RU_PLURAL[value.tiebreakers[1]]}"
-    elif value.rank == 8:
-        text = f"каре {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
-    else:
-        text = HAND_NAMES_RU[value.rank]
-    if important_kicker_values:
-        kickers = ", ".join(RANK_NAMES_RU[value] for value in sorted(important_kicker_values, reverse=True))
-        text = f"{text}, кикер {kickers}"
-    return text
+    if value.rank == 9 and value.tiebreakers and value.tiebreakers[0] == 14:
+        return "рояль флеш"
+    return HAND_NAMES_RU[value.rank]
 
+
+def _hand_strength_class(value) -> str:
+    if not value:
+        return "combo-rank-fold"
+    if value.rank == 9 and value.tiebreakers and value.tiebreakers[0] == 14:
+        return "combo-rank-10"
+    return f"combo-rank-{value.rank}"
 
 def showdown_hand_explanation(value, opponent_value=None) -> dict[str, list[dict] | str]:
     if not value:
-        return {"combination_cards": [], "kicker_cards": [], "summary": "фолд"}
+        return {"combination_cards": [], "kicker_cards": [], "summary": "фолд", "strength_class": "combo-rank-fold"}
     combination_values = _combo_values(value)
     important_kicker_values = _important_kicker_values(value, opponent_value)
     kicker_values = _kicker_values(value, important_kicker_values)
@@ -367,6 +359,7 @@ def showdown_hand_explanation(value, opponent_value=None) -> dict[str, list[dict
         "combination_cards": card_view(combination_cards),
         "kicker_cards": card_view(kicker_cards),
         "summary": _hand_description(value, important_kicker_values),
+        "strength_class": _hand_strength_class(value),
     }
 
 def card_text(cards) -> str:
@@ -505,7 +498,11 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
             "bot_kicker_cards": bot_explanation["kicker_cards"],
             "player_hand": player_explanation["summary"],
             "bot_hand": bot_explanation["summary"],
+            "player_hand_class": player_explanation["strength_class"],
+            "bot_hand_class": bot_explanation["strength_class"],
             "winner": "Ничья" if result and result["split"] else player.player_id if result and result["player_won"] else "Бот",
+            "showdown_title": "Ничья" if result and result["split"] else "Бот победил" if bot_won else "Человечек победил",
+            "showdown_title_class": "split" if result and result["split"] else "bot-win" if bot_won else "player-win",
             "bot_verdict": "Ничья" if result and result["split"] else "Бот победил" if bot_won else "Бот проиграл",
             "net": player_net,
             "player_net_label": _signed_amount(player_net),

@@ -4,7 +4,7 @@
 <section class="card showdown-top" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
   <p class="eyebrow">Общая раздача №{{ completed_hand_number }}</p>
   <span class="next-hand-label">Следующая раздача</span>
-  <h1>Showdown</h1>
+  <h1 class="showdown-title {{ hero_result.showdown_title_class }}">{{ hero_result.showdown_title }}</h1>
   <div class="compact-countdown" aria-label="Таймер до следующей раздачи">
     <strong data-seconds-left>{{ seconds_left }}</strong>
     <em>сек</em>
@@ -16,7 +16,6 @@
     {% if hero_result %}
     <article class="card showdown-result-card">
       <div class="result-summary {% if hero_result.net > 0 %}player-win{% elif hero_result.net < 0 %}bot-win{% else %}split{% endif %}">
-        <strong>{{ hero_result.bot_verdict }}</strong>
         <div class="payouts showdown-payouts">
           {% for row in results %}
           <span>{{ row.player_name }} <b class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</b></span>
@@ -25,9 +24,8 @@
       </div>
 
       <div class="showdown-combo-viewer" data-showdown-combos>
-        <div class="combo-status" aria-live="polite">
-          <span class="label">Сейчас показано</span>
-          <strong data-active-combo>Все карты без выделения</strong>
+        <div class="combo-status {{ hero_result.player_hand_class }}" aria-live="polite">
+          <strong data-active-combo>{{ hero_result.player_hand }}</strong>
         </div>
 
         <div class="showdown-table-cards" aria-label="Карты showdown">
@@ -52,8 +50,8 @@
         </div>
 
         <div class="combo-controls" aria-label="Переключение подсветки комбинаций">
-          <button type="button" data-combo-button="player" data-combo-name="Игрок: {{ hero_result.player_hand }}" data-combination-cards="{% for card in hero_result.player_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.player_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация игрока</button>
-          <button type="button" data-combo-button="bot" data-combo-name="Бот: {{ hero_result.bot_hand }}" data-combination-cards="{% for card in hero_result.bot_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.bot_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация бота</button>
+          <button type="button" data-combo-button="player" data-combo-name="{{ hero_result.player_hand }}" data-combo-class="{{ hero_result.player_hand_class }}" data-combination-cards="{% for card in hero_result.player_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.player_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация человечка</button>
+          <button type="button" data-combo-button="bot" data-combo-name="{{ hero_result.bot_hand }}" data-combo-class="{{ hero_result.bot_hand_class }}" data-combination-cards="{% for card in hero_result.bot_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.bot_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация бота</button>
         </div>
       </div>
     </article>
@@ -115,12 +113,17 @@
       }
     });
     button.classList.add('active');
-    if (status) status.textContent = button.dataset.comboName || button.textContent;
+    if (status) {
+      status.textContent = button.dataset.comboName || button.textContent;
+      const statusBox = status.closest('.combo-status');
+      if (statusBox) {
+        statusBox.className = `combo-status ${button.dataset.comboClass || ''}`.trim();
+      }
+    }
   }
 
   buttons.forEach(button => button.addEventListener('click', () => showCombo(button.dataset.comboButton)));
-  window.setTimeout(() => showCombo('player'), 1000);
-  window.setTimeout(() => showCombo('bot'), 4000);
+  showCombo('player');
 })();
 </script>
 {% endblock %}
