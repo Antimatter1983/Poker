@@ -3,21 +3,38 @@
 {% block content %}
 <section class="card stack reveal-head" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
   <p class="eyebrow">Общая раздача №{{ completed_hand_number }} · {{ common_hand_status }}</p>
-  <h1>Общее раскрытие</h1>
-  <p>Следующая раздача через <strong data-seconds-left>{{ seconds_left }}</strong> секунд</p>
+  <h1>Showdown</h1>
 </section>
-<section class="reveal-grid">
-  {% for row in results %}
-  <article class="card stack reveal-card">
-    <h2>{{ row.bot_verdict }}</h2>
-    <div class="reveal-board"><span class="label">Борд</span><div class="playing-cards board-cards">{% for card in row.board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
-    <div class="showdown-combos">
-      <div class="showdown-hand"><strong>Бот:</strong><span>Карты бота:</span><div class="playing-cards mini-cards">{% for card in row.bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div><span aria-label="Комбинация бота">Лучшая комбинация: {{ row.bot_hand }}</span><span>Лучшие 5 карт:</span><div class="playing-cards mini-cards">{% for card in row.bot_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
-      <div class="showdown-hand"><strong>Игрок: {{ row.player_name }}</strong><span>Карты:</span><div class="playing-cards mini-cards">{% for card in row.player_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div><span>Лучшая комбинация: {{ row.player_hand }}</span><span>Лучшие 5 карт:</span><div class="playing-cards mini-cards">{% for card in row.player_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
-    </div>
-    <div class="payouts"><span>{{ row.player_name }} <strong class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</strong></span><span>Бот <strong class="{% if row.net <= 0 %}positive{% else %}negative{% endif %}">{{ row.bot_net_label }}</strong></span></div>
-  </article>
-  {% endfor %}
+
+<section class="reveal-layout" aria-label="Итоги раздачи">
+  <div class="showdown-list">
+    {% for row in results %}
+    <article class="card reveal-card showdown-card">
+      <h2>{{ row.bot_verdict }}</h2>
+      <div class="reveal-board"><span class="label">Борд</span><div class="playing-cards board-cards">{% for card in row.board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+      <div class="showdown-lines">
+        <div class="showdown-line"><strong>Bot</strong><span aria-label="Комбинация бота">{{ row.bot_hand }}</span><div class="playing-cards mini-cards best-cards" aria-label="Карты бота: пять лучших карт">{% for card in row.bot_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+        <div class="showdown-line player-line"><strong>{{ row.player_name }}:</strong><span>{{ row.player_hand }}</span><div class="playing-cards mini-cards best-cards" aria-label="Пять лучших карт игрока {{ row.player_name }}">{% for card in row.player_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <aside class="reveal-side stack" aria-label="Выигрыши, гонка и таймер">
+    <section class="card stack reveal-panel payouts-panel">
+      <p class="eyebrow">Выигрыш</p>
+      <div class="payouts player-payouts">{% for row in results %}<span>{{ row.player_name }} <strong class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</strong></span>{% endfor %}</div>
+    </section>
+    {% if race_standings %}
+    <section class="card reveal-panel race-board" aria-label="Гонка стеков">
+      {% for racer in race_standings %}<div class="race-row"><span class="race-name">{{ racer.name }}</span><div class="race-track"><span class="race-runner" style="left: {{ racer.position }}%">♞</span></div><strong>{{ racer.stack }}</strong></div>{% endfor %}
+    </section>
+    {% endif %}
+    <section class="card stack reveal-panel next-countdown">
+      <p class="eyebrow">Следующая раздача</p>
+      <div class="countdown-number"><strong data-seconds-left>{{ seconds_left }}</strong><span>сек</span></div>
+    </section>
+  </aside>
 </section>
 <script>
 (function(){

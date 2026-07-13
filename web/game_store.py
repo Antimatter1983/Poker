@@ -399,4 +399,4 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
             "bot_net_label": _signed_amount(bot_net),
             "result": result,
         })
-    return rows
+    return sorted(rows, key=lambda row: row["net"], reverse=True)
