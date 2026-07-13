@@ -25,7 +25,7 @@ FINISHED = "finished"
 HAND_PLAYING = "PLAYING"
 HAND_WAITING = "WAITING"
 HAND_REVEAL = "REVEAL"
-REVEAL_SECONDS = 15
+REVEAL_SECONDS = 10
 HAND_RESULT_PAUSE_SECONDS = REVEAL_SECONDS
 
 
@@ -276,7 +276,12 @@ def card_view(cards) -> list[dict[str, str | bool]]:
     red_suits = {"H", "D"}
     rank_labels = {"T": "10"}
     return [
-        {"rank": rank_labels.get(card.rank, card.rank), "suit": suit_symbols[card.suit], "red": card.suit in red_suits}
+        {
+            "rank": rank_labels.get(card.rank, card.rank),
+            "suit": suit_symbols[card.suit],
+            "red": card.suit in red_suits,
+            "code": str(card),
+        }
         for card in cards
     ]
 
@@ -365,6 +370,92 @@ def current_hand_summary(cards) -> str:
     return HAND_NAMES[1]
 
 
+
+RANK_LABELS_RU = {
+    14: "туз",
+    13: "король",
+    12: "дама",
+    11: "валет",
+    10: "10",
+    9: "9",
+    8: "8",
+    7: "7",
+    6: "6",
+    5: "5",
+    4: "4",
+    3: "3",
+    2: "2",
+}
+
+HAND_LABELS_RU = {
+    1: "старшая карта",
+    2: "пара",
+    3: "две пары",
+    4: "тройка",
+    5: "стрит",
+    6: "флеш",
+    7: "фулл-хаус",
+    8: "каре",
+    9: "стрит-флеш",
+}
+
+
+def _cards_by_values(cards, values: set[int]):
+    return [card for card in cards if card.value in values]
+
+
+def combination_cards(value) -> tuple:
+    """Cards that visually explain the made hand, excluding comparison kickers."""
+    if value is None:
+        return tuple()
+    cards = tuple(value.best_five)
+    if value.rank in {5, 6, 7, 9}:
+        return cards
+    if value.rank == 8:
+        return tuple(_cards_by_values(cards, {value.tiebreakers[0]}))
+    if value.rank == 4:
+        return tuple(_cards_by_values(cards, {value.tiebreakers[0]}))
+    if value.rank == 3:
+        return tuple(_cards_by_values(cards, set(value.tiebreakers[:2])))
+    if value.rank == 2:
+        return tuple(_cards_by_values(cards, {value.tiebreakers[0]}))
+    if value.rank == 1:
+        return tuple(_cards_by_values(cards, {value.tiebreakers[0]})[:1])
+    return cards
+
+
+def _combination_tiebreaker_length(rank: int) -> int:
+    return {1: 1, 2: 1, 3: 2, 4: 1, 5: 1, 6: 5, 7: 2, 8: 1, 9: 1}.get(rank, 0)
+
+
+def decisive_kicker_cards(value, opponent_value) -> tuple:
+    """Return only kickers that actually decide between equal made hands."""
+    if value is None or opponent_value is None or value.rank != opponent_value.rank:
+        return tuple()
+    combo_len = _combination_tiebreaker_length(value.rank)
+    if value.tiebreakers[:combo_len] != opponent_value.tiebreakers[:combo_len]:
+        return tuple()
+    for own, other in zip(value.tiebreakers[combo_len:], opponent_value.tiebreakers[combo_len:]):
+        if own != other:
+            return tuple(_cards_by_values(value.best_five, {own})[:1])
+    return tuple()
+
+
+def explain_hand_text(value, kicker_cards=()) -> str:
+    if value is None:
+        return "fold"
+    base = HAND_LABELS_RU.get(value.rank, value.name.lower())
+    combo = combination_cards(value)
+    if value.rank in {1, 2, 4, 8} and combo:
+        base = f"{base} {RANK_LABELS_RU.get(combo[0].value, combo[0].rank)}"
+    elif value.rank == 3:
+        pairs = sorted({card.value for card in combo}, reverse=True)
+        base = f"{base} {' и '.join(RANK_LABELS_RU.get(value, str(value)) for value in pairs)}"
+    if kicker_cards:
+        base = f"{base}, кикер {RANK_LABELS_RU.get(kicker_cards[0].value, kicker_cards[0].rank)}"
+    return base
+
+
 def _signed_amount(value: int) -> str:
     return f"+{value}" if value > 0 else str(value)
 
@@ -383,6 +474,10 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
         player_net = player.stack - engine.starting_stacks.get(player.player_id, player.stack)
         bot_net = -player_net
         bot_won = bool(result and not result["split"] and not result["player_won"])
+        player_combination_cards = combination_cards(player_value)
+        bot_combination_cards = combination_cards(bot_value)
+        player_kicker_cards = decisive_kicker_cards(player_value, bot_value)
+        bot_kicker_cards = decisive_kicker_cards(bot_value, player_value)
         rows.append({
             "player_name": player.player_id,
             "player_cards": card_view(player.cards),
@@ -390,8 +485,14 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
             "board": card_view(engine.community_cards),
             "player_best_cards": card_view(player_value.best_five) if player_value else [],
             "bot_best_cards": card_view(bot_value.best_five) if bot_value else [],
+            "player_combination_cards": card_view(player_combination_cards),
+            "bot_combination_cards": card_view(bot_combination_cards),
+            "player_kicker_cards": card_view(player_kicker_cards),
+            "bot_kicker_cards": card_view(bot_kicker_cards),
             "player_hand": player_value.name if player_value else (result or {}).get("player_hand", "fold"),
             "bot_hand": bot_value.name if bot_value else (result or {}).get("bot_hand", "fold"),
+            "player_hand_explanation": explain_hand_text(player_value, player_kicker_cards),
+            "bot_hand_explanation": explain_hand_text(bot_value, bot_kicker_cards),
             "winner": "Ничья" if result and result["split"] else player.player_id if result and result["player_won"] else "Бот",
             "bot_verdict": "Ничья" if result and result["split"] else "Бот победил" if bot_won else "Бот проиграл",
             "net": player_net,
