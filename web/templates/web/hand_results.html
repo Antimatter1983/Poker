@@ -2,13 +2,10 @@
 {% block title %}Showdown · {{ lobby.title }}{% endblock %}
 {% block content %}
 <section class="card showdown-top" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
-  <div>
-    <p class="eyebrow">Общая раздача №{{ completed_hand_number }}</p>
-    <h1>Showdown</h1>
-    <small>{{ common_hand_status }}</small>
-  </div>
+  <p class="eyebrow">Общая раздача №{{ completed_hand_number }}</p>
+  <span class="next-hand-label">Следующая раздача</span>
+  <h1>Showdown</h1>
   <div class="compact-countdown" aria-label="Таймер до следующей раздачи">
-    <span>Следующая раздача</span>
     <strong data-seconds-left>{{ seconds_left }}</strong>
     <em>сек</em>
   </div>
@@ -16,31 +13,29 @@
 
 <section class="showdown-screen" aria-label="Итоги showdown">
   <div class="showdown-main">
-    {% for row in results %}
+    {% if hero_result %}
     <article class="card showdown-result-card">
-      <div class="result-strip {% if row.net > 0 %}player-win{% elif row.net < 0 %}bot-win{% else %}split{% endif %}">
-        <strong>{{ row.bot_verdict }}</strong>
-        <span>{{ row.player_name }} <b class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</b></span>
-        <span>Бот <b class="{% if row.net <= 0 %}positive{% else %}negative{% endif %}">{{ row.bot_net_label }}</b></span>
-      </div>
-
-      <div class="reveal-board compact-board">
-        <span class="label">Борд</span>
-        <div class="playing-cards board-cards">{% for card in row.board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+      <div class="result-summary {% if hero_result.net > 0 %}player-win{% elif hero_result.net < 0 %}bot-win{% else %}split{% endif %}">
+        <strong>{{ hero_result.bot_verdict }}</strong>
+        <div class="payouts showdown-payouts">
+          {% for row in results %}
+          <span>{{ row.player_name }} <b class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</b></span>
+          {% endfor %}
+        </div>
       </div>
 
       <div class="best-combos">
-        <div class="combo-row bot-combo">
-          <div><span class="label">Лучшая комбинация Бота</span><strong aria-label="Комбинация бота">{{ row.bot_hand }}</strong></div>
-          <div class="playing-cards mini-cards best-cards" aria-label="Карты бота: пять лучших карт">{% for card in row.bot_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
-        </div>
         <div class="combo-row player-combo">
-          <div><span class="label">Лучшая комбинация {{ row.player_name }}</span><strong>{{ row.player_hand }}</strong></div>
-          <div class="playing-cards mini-cards best-cards" aria-label="Пять лучших карт игрока {{ row.player_name }}">{% for card in row.player_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+          <div><span class="label">Лучшая комбинация {{ hero_result.player_name }}</span><strong>{{ hero_result.player_hand }}</strong></div>
+          <div class="playing-cards mini-cards best-cards" aria-label="Пять лучших карт игрока {{ hero_result.player_name }}">{% for card in hero_result.player_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+        </div>
+        <div class="combo-row bot-combo">
+          <div><span class="label">Лучшая комбинация Бота</span><strong aria-label="Комбинация бота">{{ hero_result.bot_hand }}</strong></div>
+          <div class="playing-cards mini-cards best-cards" aria-label="Карты бота: пять лучших карт">{% for card in hero_result.bot_best_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
         </div>
       </div>
     </article>
-    {% endfor %}
+    {% endif %}
   </div>
 
   {% if race_standings %}
