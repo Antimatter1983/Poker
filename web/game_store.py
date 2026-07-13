@@ -465,6 +465,18 @@ def current_hand_summary(cards) -> str:
     return HAND_NAMES[1]
 
 
+
+def current_hand_summary_ru(cards) -> str:
+    cards = list(cards)
+    if len(cards) < 5:
+        return "—"
+    from itertools import combinations
+    from poker.hand_evaluator import _evaluate_five
+    value = max((_evaluate_five(tuple(combo)) for combo in combinations(cards, 5)), key=lambda h: h._key())
+    if value.rank == 9 and value.tiebreakers and value.tiebreakers[0] == 14:
+        return "рояль флеш"
+    return HAND_NAMES_RU[value.rank]
+
 def _signed_amount(value: int) -> str:
     return f"+{value}" if value > 0 else str(value)
 
