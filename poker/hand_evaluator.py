@@ -59,17 +59,26 @@ def _straight_high(values: list[int]) -> int | None:
     return None
 
 
-def _ordered_cards(cards: tuple[Card, ...], tiebreakers: tuple[int, ...]) -> tuple[Card, ...]:
-    remaining = list(cards)
+def _cards_matching_value(cards: tuple[Card, ...], value: int) -> list[Card]:
+    wanted = 14 if value == 1 else value
+    return [card for card in cards if card.value == wanted]
+
+
+def _cards_excluding_values(cards: tuple[Card, ...], excluded: set[int]) -> list[Card]:
+    return sorted((card for card in cards if card.value not in excluded), key=lambda c: c.value, reverse=True)
+
+
+def _straight_values(high: int) -> tuple[int, ...]:
+    if high == 5:
+        return (5, 4, 3, 2, 14)
+    return tuple(range(high, high - 5, -1))
+
+
+def _straight_cards(cards: tuple[Card, ...], high: int) -> tuple[Card, ...]:
     ordered = []
-    for value in tiebreakers:
-        wanted = 14 if value == 1 else value
-        for card in list(remaining):
-            if card.value == wanted:
-                ordered.append(card)
-                remaining.remove(card)
-    ordered.extend(sorted(remaining, key=lambda c: c.value, reverse=True))
-    return tuple(ordered[:5])
+    for value in _straight_values(high):
+        ordered.append(_cards_matching_value(cards, value)[0])
+    return tuple(ordered)
 
 
 def _evaluate_five(cards: tuple[Card, ...]) -> HandValue:
@@ -81,27 +90,38 @@ def _evaluate_five(cards: tuple[Card, ...]) -> HandValue:
 
     if flush and straight:
         rank, tb = 9, (straight,)
+        best_five = _straight_cards(cards, straight)
     elif groups[0][1] == 4:
         quad = groups[0][0]
-        rank, tb = 8, (quad, max(v for v in values if v != quad))
+        kicker = max(v for v in values if v != quad)
+        rank, tb = 8, (quad, kicker)
+        best_five = tuple(_cards_matching_value(cards, quad) + _cards_matching_value(cards, kicker))
     elif groups[0][1] == 3 and groups[1][1] == 2:
-        rank, tb = 7, (groups[0][0], groups[1][0])
+        trips, pair = groups[0][0], groups[1][0]
+        rank, tb = 7, (trips, pair)
+        best_five = tuple(_cards_matching_value(cards, trips) + _cards_matching_value(cards, pair))
     elif flush:
         rank, tb = 6, tuple(values)
+        best_five = tuple(sorted(cards, key=lambda c: c.value, reverse=True))
     elif straight:
         rank, tb = 5, (straight,)
+        best_five = _straight_cards(cards, straight)
     elif groups[0][1] == 3:
         trips = groups[0][0]
         kickers = sorted((v for v in values if v != trips), reverse=True)
         rank, tb = 4, (trips, *kickers)
+        best_five = tuple(_cards_matching_value(cards, trips) + _cards_excluding_values(cards, {trips})[:2])
     elif groups[0][1] == 2 and groups[1][1] == 2:
         pairs = sorted([v for v, c in counts.items() if c == 2], reverse=True)
         kicker = max(v for v in values if v not in pairs)
         rank, tb = 3, (pairs[0], pairs[1], kicker)
+        best_five = tuple(_cards_matching_value(cards, pairs[0]) + _cards_matching_value(cards, pairs[1]) + _cards_matching_value(cards, kicker))
     elif groups[0][1] == 2:
         pair = groups[0][0]
         kickers = sorted((v for v in values if v != pair), reverse=True)
         rank, tb = 2, (pair, *kickers)
+        best_five = tuple(_cards_matching_value(cards, pair) + _cards_excluding_values(cards, {pair})[:3])
     else:
         rank, tb = 1, tuple(values)
-    return HandValue(rank, HAND_NAMES[rank], tb, _ordered_cards(cards, tb))
+        best_five = tuple(sorted(cards, key=lambda c: c.value, reverse=True))
+    return HandValue(rank, HAND_NAMES[rank], tb, best_five)
