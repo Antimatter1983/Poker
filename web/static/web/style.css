@@ -34,7 +34,7 @@ body.play-screen{height:100dvh;overflow:hidden}.play-screen .topbar{display:none
 /* Compact postflop pot: mirror the hero combo badge footprint and keep the pot wide, not tall. */
 .postflop-felt .table-pot,
 .postflop-felt .hero-combo-badge.visible{inline-size:clamp(220px,42vw,360px);min-height:50px}
-.postflop-felt .table-pot{display:flex;align-items:center;justify-content:center;gap:10px;padding:7px 18px;text-align:center;white-space:nowrap}
+.postflop-felt .table-pot{display:flex;align-items:center;justify-content:center;align-self:center;block-size:52px;max-block-size:52px;gap:10px;padding:7px 18px;text-align:center;white-space:nowrap;overflow:hidden}
 .postflop-felt .pot-label{font-size:.62rem}.postflop-felt .table-pot strong{font-size:clamp(1rem,3vw,1.35rem)}
 .postflop-felt .pot-gold-stack{flex:0 0 34px;width:34px;height:18px;grid-row:auto}
-@media (max-width:720px){.postflop-felt .table-pot,.postflop-felt .hero-combo-badge.visible{inline-size:min(82vw,320px);min-height:44px}.postflop-felt .table-pot{gap:8px;padding:6px 14px}.postflop-felt .pot-label{font-size:.58rem}.postflop-felt .pot-gold-stack{flex-basis:30px;width:30px;height:16px}}
+@media (max-width:720px){.postflop-felt .table-pot,.postflop-felt .hero-combo-badge.visible{inline-size:min(82vw,320px);min-height:44px}.postflop-felt .table-pot{block-size:46px;max-block-size:46px;gap:8px;padding:6px 14px}.postflop-felt .pot-label{font-size:.58rem}.postflop-felt .pot-gold-stack{flex-basis:30px;width:30px;height:16px}}
