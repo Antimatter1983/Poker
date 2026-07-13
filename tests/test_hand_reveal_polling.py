@@ -98,7 +98,9 @@ def test_results_page_only_reveals_bot_cards_and_full_table_in_reveal():
     reveal = client_as("alice").get(reverse("web:hand_results", kwargs={"code": "code", "hand_number": 1}))
     content = reveal.content.decode()
     assert "Карты бота" in content
-    assert "Комбинация бота" in content
+    assert "Бот:" in content
+    assert "Комбинация бота" not in content
+    assert "Общая раздача" not in content
     assert "bob" in content
 
 
