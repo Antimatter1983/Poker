@@ -51,13 +51,13 @@ def test_full_house_highlights_five_combination_cards():
     assert_combo_count("AS AD AH KC KS 4D 2C", "Full House", 5)
 
 
-def test_high_card_highlights_top_card_and_marks_remaining_best_cards_as_kickers():
+def test_high_card_highlights_only_top_card_without_rendered_kickers():
     value = E("AS KD QH 9C 8S 4D 2C")
     explanation = showdown_hand_explanation(value)
 
     assert value.name == "High Card"
     assert codes(explanation["combination_cards"]) == {"AS"}
-    assert codes(explanation["kicker_cards"]) == {"KD", "QH", "9C", "8S"}
+    assert explanation["kicker_cards"] == []
 
 
 def test_equal_pairs_can_describe_deciding_kicker():

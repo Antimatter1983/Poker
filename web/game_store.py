@@ -321,8 +321,8 @@ def _important_kicker_values(value, opponent_value) -> set[int]:
 
 
 def _kicker_values(value) -> set[int]:
-    """Return all non-combination tiebreaker card values from the best five."""
-    if not value:
+    """Return rendered kicker card values from the best five."""
+    if not value or value.rank == 1:
         return set()
     combo_values = _combo_values(value)
     return {card.value for card in value.best_five if card.value not in combo_values}
