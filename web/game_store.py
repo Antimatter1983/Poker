@@ -320,6 +320,14 @@ def _important_kicker_values(value, opponent_value) -> set[int]:
     return set()
 
 
+def _kicker_values(value) -> set[int]:
+    """Return all non-combination tiebreaker card values from the best five."""
+    if not value:
+        return set()
+    combo_values = _combo_values(value)
+    return {card.value for card in value.best_five if card.value not in combo_values}
+
+
 def _hand_description(value, important_kicker_values: set[int]) -> str:
     if not value:
         return "фолд"
@@ -347,9 +355,10 @@ def showdown_hand_explanation(value, opponent_value=None) -> dict[str, list[dict
     if not value:
         return {"combination_cards": [], "kicker_cards": [], "summary": "фолд"}
     combination_values = _combo_values(value)
+    kicker_values = _kicker_values(value)
     important_kicker_values = _important_kicker_values(value, opponent_value)
     combination_cards = _cards_with_values(value.best_five, combination_values)
-    kicker_cards = _cards_with_values(value.best_five, important_kicker_values)
+    kicker_cards = _cards_with_values(value.best_five, kicker_values)
     return {
         "combination_cards": card_view(combination_cards),
         "kicker_cards": card_view(kicker_cards),
