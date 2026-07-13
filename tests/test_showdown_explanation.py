@@ -80,5 +80,25 @@ def test_equal_pairs_can_describe_deciding_kicker():
     assert len(bot_explanation["combination_cards"]) == 2
     assert codes(player_explanation["kicker_cards"]) == {"AH"}
     assert codes(bot_explanation["kicker_cards"]) == {"KH"}
-    assert "кикер туз" in player_explanation["summary"]
-    assert "кикер король" in bot_explanation["summary"]
+    assert player_explanation["summary"] == "пара"
+    assert bot_explanation["summary"] == "пара"
+
+
+def test_showdown_uses_short_combination_names_and_strength_classes():
+    examples = [
+        ("AS KD QH 9C 8S 4D 2C", "старшая карта", "combo-rank-1"),
+        ("TS TD AH KC 8S 4D 2C", "пара", "combo-rank-2"),
+        ("TS TD AH AC 8S 4D 2C", "две пары", "combo-rank-3"),
+        ("7S 7D 7C AH KS 4D 2C", "три карты", "combo-rank-4"),
+        ("AS KD QH JC TS 4D 2C", "стрит", "combo-rank-5"),
+        ("AS QS 9S 6S 3S 4D 2C", "флэш", "combo-rank-6"),
+        ("AS AD AH KC KS 4D 2C", "фуллхаус", "combo-rank-7"),
+        ("7S 7D 7C 7H KS 4D 2C", "каре", "combo-rank-8"),
+        ("9S 8S 7S 6S 5S 4D 2C", "стрит флэш", "combo-rank-9"),
+        ("AS KS QS JS TS 4D 2C", "рояль флеш", "combo-rank-10"),
+    ]
+
+    for cards, summary, strength_class in examples:
+        explanation = showdown_hand_explanation(E(cards))
+        assert explanation["summary"] == summary
+        assert explanation["strength_class"] == strength_class
