@@ -126,7 +126,9 @@ def hand_results(request: HttpRequest, code: str, hand_number: int):
     if lobby.hand_state != game_store.HAND_REVEAL:
         return redirect("web:hand_wait", code=code, hand_number=hand_number)
     context = _tournament_context(lobby, player_name, completed_hand_number=hand_number)
-    context.update({"results": game_store.hand_results(lobby), "seconds_left": lobby.reveal_seconds_left()})
+    results = game_store.hand_results(lobby)
+    hero_result = next((row for row in results if row["player_name"] == player_name), None)
+    context.update({"results": results, "hero_result": hero_result, "seconds_left": lobby.reveal_seconds_left()})
     return render(request, "web/hand_results.html", context)
 
 
