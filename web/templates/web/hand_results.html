@@ -52,8 +52,8 @@
         </div>
 
         <div class="combo-controls" aria-label="Переключение подсветки комбинаций">
-          <button type="button" data-combo-button="player" data-combo-name="{{ hero_result.player_hand }}" data-best-cards="{% for card in hero_result.player_best_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация игрока</button>
-          <button type="button" data-combo-button="bot" data-combo-name="{{ hero_result.bot_hand }}" data-best-cards="{% for card in hero_result.bot_best_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация бота</button>
+          <button type="button" data-combo-button="player" data-combo-name="Игрок: {{ hero_result.player_hand }}" data-combination-cards="{% for card in hero_result.player_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.player_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация игрока</button>
+          <button type="button" data-combo-button="bot" data-combo-name="Бот: {{ hero_result.bot_hand }}" data-combination-cards="{% for card in hero_result.bot_combination_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}" data-kicker-cards="{% for card in hero_result.bot_kicker_cards %}{{ card.code }}{% if not forloop.last %} {% endif %}{% endfor %}">Комбинация бота</button>
         </div>
       </div>
     </article>
@@ -90,18 +90,32 @@
   const buttons = Array.from(viewer.querySelectorAll('[data-combo-button]'));
 
   function clearSelection(){
-    cards.forEach(card => card.classList.remove('highlight', 'dimmed'));
+    cards.forEach(card => {
+      card.classList.remove('highlight', 'combination-highlight', 'kicker-highlight', 'dimmed');
+      card.removeAttribute('data-kicker-label');
+    });
     buttons.forEach(button => button.classList.remove('active'));
   }
 
   function showCombo(type){
     const button = viewer.querySelector(`[data-combo-button="${type}"]`);
     if (!button) return;
-    const bestCards = new Set((button.dataset.bestCards || '').split(/\s+/).filter(Boolean));
+    const combinationCards = new Set((button.dataset.combinationCards || '').split(/\s+/).filter(Boolean));
+    const kickerCards = new Set((button.dataset.kickerCards || '').split(/\s+/).filter(Boolean));
     clearSelection();
-    cards.forEach(card => card.classList.add(bestCards.has(card.dataset.card) ? 'highlight' : 'dimmed'));
+    cards.forEach(card => {
+      if (combinationCards.has(card.dataset.card)) {
+        card.classList.add('combination-highlight');
+      } else if (kickerCards.has(card.dataset.card)) {
+        card.classList.add('kicker-highlight');
+        card.setAttribute('data-kicker-label', 'кикер');
+      } else {
+        card.classList.add('dimmed');
+        card.removeAttribute('data-kicker-label');
+      }
+    });
     button.classList.add('active');
-    if (status) status.textContent = `${button.textContent}: ${button.dataset.comboName || '—'}`;
+    if (status) status.textContent = button.dataset.comboName || button.textContent;
   }
 
   buttons.forEach(button => button.addEventListener('click', () => showCombo(button.dataset.comboButton)));

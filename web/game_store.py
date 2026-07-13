@@ -267,6 +267,95 @@ def get(code: str) -> LobbyTournament:
         raise ValueError("Турнир не найден") from exc
 
 
+RANK_NAMES_RU = {
+    14: "туз", 13: "король", 12: "дама", 11: "валет", 10: "десятка",
+    9: "девятка", 8: "восьмёрка", 7: "семёрка", 6: "шестёрка",
+    5: "пятёрка", 4: "четвёрка", 3: "тройка", 2: "двойка",
+}
+RANK_NAMES_RU_PLURAL = {
+    14: "тузов", 13: "королей", 12: "дам", 11: "валетов", 10: "десяток",
+    9: "девяток", 8: "восьмёрок", 7: "семёрок", 6: "шестёрок",
+    5: "пятёрок", 4: "четвёрок", 3: "троек", 2: "двоек",
+}
+HAND_NAMES_RU = {
+    1: "старшая карта", 2: "пара", 3: "две пары", 4: "тройка",
+    5: "стрит", 6: "флеш", 7: "фулл-хаус", 8: "каре", 9: "стрит-флеш",
+}
+
+
+def _cards_with_values(cards, values: set[int]):
+    return tuple(card for card in cards if card.value in values)
+
+
+def _combo_values(value) -> set[int]:
+    if value.rank in {5, 6, 7, 9}:
+        return {card.value for card in value.best_five}
+    if value.rank == 1:
+        return {value.tiebreakers[0]}
+    if value.rank in {2, 4, 8}:
+        return {value.tiebreakers[0]}
+    if value.rank == 3:
+        return set(value.tiebreakers[:2])
+    return {card.value for card in value.best_five}
+
+
+def _kicker_tiebreaker_indexes(rank: int) -> set[int]:
+    return {
+        1: {1, 2, 3, 4},
+        2: {1, 2, 3},
+        3: {2},
+        4: {1, 2},
+        8: {1},
+    }.get(rank, set())
+
+
+def _important_kicker_values(value, opponent_value) -> set[int]:
+    if not value or not opponent_value or value.rank != opponent_value.rank or value.tiebreakers == opponent_value.tiebreakers:
+        return set()
+    kicker_indexes = _kicker_tiebreaker_indexes(value.rank)
+    for index, own_breaker in enumerate(value.tiebreakers):
+        other_breaker = opponent_value.tiebreakers[index] if index < len(opponent_value.tiebreakers) else None
+        if own_breaker != other_breaker:
+            return {own_breaker} if index in kicker_indexes else set()
+    return set()
+
+
+def _hand_description(value, important_kicker_values: set[int]) -> str:
+    if not value:
+        return "фолд"
+    if value.rank == 1:
+        text = f"старшая карта {RANK_NAMES_RU[value.tiebreakers[0]]}"
+    elif value.rank == 2:
+        text = f"пара {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
+    elif value.rank == 3:
+        text = f"две пары: {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]} и {RANK_NAMES_RU_PLURAL[value.tiebreakers[1]]}"
+    elif value.rank == 4:
+        text = f"тройка {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
+    elif value.rank == 7:
+        text = f"фулл-хаус: {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]} и {RANK_NAMES_RU_PLURAL[value.tiebreakers[1]]}"
+    elif value.rank == 8:
+        text = f"каре {RANK_NAMES_RU_PLURAL[value.tiebreakers[0]]}"
+    else:
+        text = HAND_NAMES_RU[value.rank]
+    if important_kicker_values:
+        kickers = ", ".join(RANK_NAMES_RU[value] for value in sorted(important_kicker_values, reverse=True))
+        text = f"{text}, кикер {kickers}"
+    return text
+
+
+def showdown_hand_explanation(value, opponent_value=None) -> dict[str, list[dict] | str]:
+    if not value:
+        return {"combination_cards": [], "kicker_cards": [], "summary": "фолд"}
+    combination_values = _combo_values(value)
+    important_kicker_values = _important_kicker_values(value, opponent_value)
+    combination_cards = _cards_with_values(value.best_five, combination_values)
+    kicker_cards = _cards_with_values(value.best_five, important_kicker_values)
+    return {
+        "combination_cards": card_view(combination_cards),
+        "kicker_cards": card_view(kicker_cards),
+        "summary": _hand_description(value, important_kicker_values),
+    }
+
 def card_text(cards) -> str:
     return " ".join(str(card) for card in cards) or "—"
 
@@ -388,6 +477,8 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
         player_net = player.stack - engine.starting_stacks.get(player.player_id, player.stack)
         bot_net = -player_net
         bot_won = bool(result and not result["split"] and not result["player_won"])
+        player_explanation = showdown_hand_explanation(player_value, bot_value)
+        bot_explanation = showdown_hand_explanation(bot_value, player_value)
         rows.append({
             "player_name": player.player_id,
             "player_cards": card_view(player.cards),
@@ -395,8 +486,12 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
             "board": card_view(engine.community_cards),
             "player_best_cards": card_view(player_value.best_five) if player_value else [],
             "bot_best_cards": card_view(bot_value.best_five) if bot_value else [],
-            "player_hand": player_value.name if player_value else (result or {}).get("player_hand", "fold"),
-            "bot_hand": bot_value.name if bot_value else (result or {}).get("bot_hand", "fold"),
+            "player_combination_cards": player_explanation["combination_cards"],
+            "bot_combination_cards": bot_explanation["combination_cards"],
+            "player_kicker_cards": player_explanation["kicker_cards"],
+            "bot_kicker_cards": bot_explanation["kicker_cards"],
+            "player_hand": player_explanation["summary"],
+            "bot_hand": bot_explanation["summary"],
             "winner": "Ничья" if result and result["split"] else player.player_id if result and result["player_won"] else "Бот",
             "bot_verdict": "Ничья" if result and result["split"] else "Бот победил" if bot_won else "Бот проиграл",
             "net": player_net,
