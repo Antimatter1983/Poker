@@ -1,19 +1,47 @@
 {% extends 'web/base.html' %}
 {% block title %}Ожидание · {{ lobby.title }}{% endblock %}
+{% block body_class %}play-screen{% endblock %}
 {% block content %}
-<section class="card stack waiting-banner" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}">
-  <p class="eyebrow">Общая раздача №{{ completed_hand_number }}</p>
-  <h1>Ожидаем остальных игроков</h1>
-  <p><b data-finished-count>{{ finished_player_count }}</b> из <b data-total-count>{{ total_player_count }}</b> участников завершили раздачу.</p>
-  <p>Статус текущей общей раздачи: <strong data-common-status>{{ common_hand_status }}</strong></p>
-  {% if result %}<p>Ваш итог по фишкам: <strong>{% if result.player_won %}+{% elif result.split %}{% else %}-{% endif %}{{ result.amount }}</strong></p>{% endif %}
+<section class="table card play-only">
+  <div class="play-toolbar" aria-label="Навигация стола">
+    <a class="icon-link" href="{% url 'web:home' %}" aria-label="Вернуться в лобби">⌂</a>
+    <span>{{ player_name }} · {{ hero_blind }} · Раздача {{ completed_hand_number }}/{{ lobby.hand_count }}</span>
+    <span>{{ common_hand_status }}</span>
+  </div>
+
+  <div class="felt minimal-felt">
+    <div class="seat opponent">
+      <span class="label">Бот · {{ bot_blind }} против {{ player_name }}</span>
+      <span class="combo-label">Комбинация: {{ bot_hand_summary }}</span>
+      <div class="playing-cards"><span class="poker-card back">?</span><span class="poker-card back">?</span></div>
+    </div>
+    <div class="felt-race-slot">
+      {% if race_standings %}<div class="race-board compact-race" aria-label="Гонка стеков">{% for racer in race_standings %}<div class="race-row"><span class="race-name">{{ racer.name }}</span><div class="race-track"><span class="race-runner" style="left: {{ racer.position }}%">♞</span></div><strong>{{ racer.stack }}</strong></div>{% endfor %}</div>{% endif %}
+    </div>
+    <div class="community">
+      <span class="label">Борд</span>
+      <div class="playing-cards board-cards">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
+    </div>
+    <div class="seat hero-seat">
+      <span class="label">{{ player_name }} · {{ hero_blind }} · ваши карты</span>
+      <span class="combo-label">Комбинация: {{ hero_hand_summary }}</span>
+      <div class="playing-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+    </div>
+  </div>
+
+  <div class="wait-info-panel" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}">
+    <strong>Ожидаем остальных игроков</strong>
+    <span>Раздача <b>{{ completed_hand_number }}</b> из <b>{{ lobby.hand_count }}</b></span>
+    <span>Готово: <b data-finished-count>{{ finished_player_count }}</b>/<b data-total-count>{{ total_player_count }}</b></span>
+    <small>Следующая раздача или раскрытие откроется автоматически.</small>
+  </div>
 </section>
 <script>
 (function(){
   const box = document.querySelector('[data-status-url]');
+  if (!box) return;
   const finished = box.querySelector('[data-finished-count]');
   const total = box.querySelector('[data-total-count]');
-  const status = box.querySelector('[data-common-status]');
   async function poll(){
     try {
       const response = await fetch(box.dataset.statusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
@@ -22,7 +50,6 @@
       if (data.status === 'reveal' && data.url) window.location.href = data.url;
       if (finished && data.finished_count !== undefined) finished.textContent = data.finished_count;
       if (total && data.total_count !== undefined) total.textContent = data.total_count;
-      if (status && data.status) status.textContent = data.status.toUpperCase();
     } catch (e) { console.warn('Polling failed', e); }
   }
   setInterval(poll, 1500); poll();

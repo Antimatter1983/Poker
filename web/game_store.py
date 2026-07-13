@@ -25,7 +25,7 @@ FINISHED = "finished"
 HAND_PLAYING = "PLAYING"
 HAND_WAITING = "WAITING"
 HAND_REVEAL = "REVEAL"
-REVEAL_SECONDS = 20
+REVEAL_SECONDS = 10
 HAND_RESULT_PAUSE_SECONDS = REVEAL_SECONDS
 
 
@@ -365,6 +365,10 @@ def current_hand_summary(cards) -> str:
     return HAND_NAMES[1]
 
 
+def _signed_amount(value: int) -> str:
+    return f"+{value}" if value > 0 else str(value)
+
+
 def hand_results(lobby: LobbyTournament) -> list[dict]:
     if lobby.game is None:
         return []
@@ -376,15 +380,23 @@ def hand_results(lobby: LobbyTournament) -> list[dict]:
         result = hand_result(engine, player.player_id)
         player_value = engine.hand_values.get(player.player_id)
         bot_value = engine.hand_values.get(bot.player_id)
+        player_net = player.stack - engine.starting_stacks.get(player.player_id, player.stack)
+        bot_net = -player_net
+        bot_won = bool(result and not result["split"] and not result["player_won"])
         rows.append({
             "player_name": player.player_id,
             "player_cards": card_view(player.cards),
             "bot_cards": card_view(bot.cards),
             "board": card_view(engine.community_cards),
+            "player_combo_cards": card_view(player.cards + engine.community_cards),
+            "bot_combo_cards": card_view(bot.cards + engine.community_cards),
             "player_hand": player_value.name if player_value else (result or {}).get("player_hand", "fold"),
             "bot_hand": bot_value.name if bot_value else (result or {}).get("bot_hand", "fold"),
             "winner": "Ничья" if result and result["split"] else player.player_id if result and result["player_won"] else "Бот",
-            "net": player.stack - engine.starting_stacks.get(player.player_id, player.stack),
+            "bot_verdict": "Ничья" if result and result["split"] else "Бот победил" if bot_won else "Бот проиграл",
+            "net": player_net,
+            "player_net_label": _signed_amount(player_net),
+            "bot_net_label": _signed_amount(bot_net),
             "result": result,
         })
     return rows

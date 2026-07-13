@@ -71,8 +71,7 @@ class Tournament:
             raise ValueError("It is not this player's turn")
         table.engine.act(action, amount)
         self._run_ready_bots()
-        if self.all_tables_waiting_at_barrier():
-            self._reset_action_deadline()
+        self._reset_action_deadline()
 
     def process_timeouts(self) -> list[str]:
         """Auto-play overdue human turns and return affected player ids."""
