@@ -79,7 +79,7 @@ def test_last_player_moves_common_hand_to_reveal_and_all_get_results_url(monkeyp
 
     assert lobby.hand_state == game_store.HAND_REVEAL
     assert lobby.reveal_started_at == 100.0
-    assert lobby.reveal_until == 115.0
+    assert lobby.reveal_until == 110.0
     assert status["status"] == "reveal"
     assert status["url"] == reverse("web:hand_results", kwargs={"code": "code", "hand_number": 1})
     assert other_status == status
@@ -111,7 +111,7 @@ def test_reveal_timer_creates_single_next_hand_and_reuses_url(monkeypatch):
     lobby.start_reveal()
 
     reveal = client_as("alice").get(reverse("web:reveal_status", kwargs={"code": "code", "hand_number": 1})).json()
-    assert reveal == {"status": "reveal", "seconds_left": 15}
+    assert reveal == {"status": "reveal", "seconds_left": 10}
 
     now = 116.0
     first = client_as("alice").get(reverse("web:reveal_status", kwargs={"code": "code", "hand_number": 1})).json()
