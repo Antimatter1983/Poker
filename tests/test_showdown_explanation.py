@@ -24,19 +24,28 @@ def assert_combo_count(cards, expected_name, expected_count, expected_kicker_cou
 
 
 def test_pair_highlights_two_combination_cards():
-    assert_combo_count("TS TD AH KC 8S 4D 2C", "One Pair", 2, 3)
+    assert_combo_count("TS TD AH KC 8S 4D 2C", "One Pair", 2, 0)
+
+
+def test_pair_split_between_hole_card_and_board_highlights_only_pair_cards():
+    value = E("TS AH TD KC 8S 4D 2C")
+    explanation = showdown_hand_explanation(value)
+
+    assert value.name == "One Pair"
+    assert codes(explanation["combination_cards"]) == {"TS", "TD"}
+    assert explanation["kicker_cards"] == []
 
 
 def test_two_pair_highlights_four_combination_cards():
-    assert_combo_count("TS TD AH AC 8S 4D 2C", "Two Pair", 4, 1)
+    assert_combo_count("TS TD AH AC 8S 4D 2C", "Two Pair", 4, 0)
 
 
 def test_three_of_a_kind_highlights_three_combination_cards():
-    assert_combo_count("7S 7D 7C AH KS 4D 2C", "Three of a Kind", 3, 2)
+    assert_combo_count("7S 7D 7C AH KS 4D 2C", "Three of a Kind", 3, 0)
 
 
 def test_four_of_a_kind_highlights_four_combination_cards():
-    assert_combo_count("7S 7D 7C 7H KS 4D 2C", "Four of a Kind", 4, 1)
+    assert_combo_count("7S 7D 7C 7H KS 4D 2C", "Four of a Kind", 4, 0)
 
 
 def test_straight_highlights_five_combination_cards():
@@ -69,7 +78,7 @@ def test_equal_pairs_can_describe_deciding_kicker():
 
     assert len(player_explanation["combination_cards"]) == 2
     assert len(bot_explanation["combination_cards"]) == 2
-    assert codes(player_explanation["kicker_cards"]) == {"AH", "9C", "8S"}
-    assert codes(bot_explanation["kicker_cards"]) == {"KH", "9D", "8C"}
+    assert codes(player_explanation["kicker_cards"]) == {"AH"}
+    assert codes(bot_explanation["kicker_cards"]) == {"KH"}
     assert "кикер туз" in player_explanation["summary"]
     assert "кикер король" in bot_explanation["summary"]
