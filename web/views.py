@@ -24,10 +24,20 @@ def _require_player(lobby: game_store.LobbyTournament, code: str, request: HttpR
     return player_name
 
 
+def _blind_label_and_role(engine, participant) -> tuple[str, str]:
+    if not engine or not participant:
+        return "", ""
+    if engine.small_blind_player is participant:
+        return "МБ", "sb"
+    return "ББ", "bb"
+
+
 def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | None, *, is_waiting_room: bool = False, completed_hand_number: int | None = None):
     table = lobby.table_for(player_name) if player_name else None
     engine = table.engine if table else None
     player_turn = bool(engine and table and not engine.finished and engine.current_player is table.player)
+    hero_blind, hero_blind_role = _blind_label_and_role(engine, table.player if table else None)
+    bot_blind, bot_blind_role = _blind_label_and_role(engine, table.bot if table else None)
     return {
         "lobby": lobby,
         "player_name": player_name,
@@ -54,8 +64,10 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
         "next_hand_wait_seconds": None,
         "action_timer_seconds": None if is_waiting_room else (lobby.game.seconds_to_action_deadline() if lobby.game else None),
         "unfinished_players": lobby.unfinished_player_names(),
-        "hero_blind": "МБ" if engine and table and engine.small_blind_player is table.player else "ББ" if engine and table else "",
-        "bot_blind": "МБ" if engine and table and engine.small_blind_player is table.bot else "ББ" if engine and table else "",
+        "hero_blind": hero_blind,
+        "hero_blind_role": hero_blind_role,
+        "bot_blind": bot_blind,
+        "bot_blind_role": bot_blind_role,
         "is_waiting_room": is_waiting_room,
         "completed_hand_number": completed_hand_number,
         "finished_player_count": lobby.finished_player_count(completed_hand_number),
