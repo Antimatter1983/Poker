@@ -1,23 +1,23 @@
 {% extends 'web/base.html' %}
 {% block title %}Раскрытие · {{ lobby.title }}{% endblock %}
 {% block content %}
-<section class="card stack" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
+<section class="card stack reveal-head" data-reveal-status-url="{% url 'web:reveal_status' lobby.code completed_hand_number %}">
   <p class="eyebrow">Общая раздача №{{ completed_hand_number }} · {{ common_hand_status }}</p>
   <h1>Общее раскрытие</h1>
   <p>Следующая раздача через <strong data-seconds-left>{{ seconds_left }}</strong> секунд</p>
 </section>
-<section class="card stack">
-  <h2>Таблица результатов</h2>
-  <table>
-    <thead><tr><th>Игрок</th><th>Карты игрока</th><th>Карты бота</th><th>Борд</th><th>Комбинация игрока</th><th>Комбинация бота</th><th>Победитель</th><th>Итог</th></tr></thead>
-    <tbody>{% for row in results %}<tr>
-      <td>{{ row.player_name }}</td>
-      <td>{% for card in row.player_cards %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
-      <td>{% for card in row.bot_cards %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
-      <td>{% for card in row.board %}{{ card.rank }}{{ card.suit }} {% endfor %}</td>
-      <td>{{ row.player_hand }}</td><td>{{ row.bot_hand }}</td><td>{{ row.winner }}</td><td>{{ row.net }}</td>
-    </tr>{% endfor %}</tbody>
-  </table>
+<section class="reveal-grid">
+  {% for row in results %}
+  <article class="card stack reveal-card">
+    <h2>{{ row.bot_verdict }}</h2>
+    <div class="reveal-board"><span class="label">Борд</span><div class="playing-cards board-cards">{% for card in row.board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+    <div class="showdown-combos">
+      <div class="showdown-hand"><strong>Карты бота</strong><span>Комбинация бота: {{ row.bot_hand }}</span><div class="playing-cards mini-cards">{% for card in row.bot_combo_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+      <div class="showdown-hand"><strong>{{ row.player_name }}</strong><span>Комбинация игрока: {{ row.player_hand }}</span><div class="playing-cards mini-cards">{% for card in row.player_combo_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+    </div>
+    <div class="payouts"><span>{{ row.player_name }} <strong class="{% if row.net >= 0 %}positive{% else %}negative{% endif %}">{{ row.player_net_label }}</strong></span><span>Бот <strong class="{% if row.net <= 0 %}positive{% else %}negative{% endif %}">{{ row.bot_net_label }}</strong></span></div>
+  </article>
+  {% endfor %}
 </section>
 <script>
 (function(){
