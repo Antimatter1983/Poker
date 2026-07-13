@@ -24,3 +24,69 @@ def test_kicker_comparison_and_tie():
     ace_pair_queen = E("AS AD QH 9C 7S 3D 2C")
     assert ace_pair_king > ace_pair_queen
     assert E("AS KD QH JC 9S 3D 2C") == E("AH KC QS JD 9D 3C 2H")
+
+
+def S(value): return tuple(str(card) for card in value.best_five)
+
+
+def assert_best_five(cards, name, expected):
+    value = E(cards)
+    assert value.name == name
+    assert len(value.best_five) == 5
+    assert S(value) == tuple(expected.split())
+
+
+def test_best_five_three_of_a_kind_uses_two_real_kickers():
+    assert_best_five(
+        "7S 7D 7C AS KD 4H 2C",
+        "Three of a Kind",
+        "7S 7D 7C AS KD",
+    )
+
+
+def test_best_five_full_house_uses_trips_and_pair():
+    assert_best_five(
+        "QH QS QC 7S 7D AS KD",
+        "Full House",
+        "QH QS QC 7S 7D",
+    )
+
+
+def test_best_five_two_pair_uses_two_highest_pairs_and_kicker():
+    assert_best_five(
+        "AS AD KH KC QS QD 2C",
+        "Two Pair",
+        "AS AD KH KC QS",
+    )
+
+
+def test_best_five_flush_uses_five_highest_suited_cards():
+    assert_best_five(
+        "AS QS 9S 6S 3S 2S TC",
+        "Flush",
+        "AS QS 9S 6S 3S",
+    )
+
+
+def test_best_five_straight_uses_exact_sequence():
+    assert_best_five(
+        "AS KD QH JC TS 9D 2C",
+        "Straight",
+        "AS KD QH JC TS",
+    )
+
+
+def test_best_five_four_of_a_kind_uses_best_kicker():
+    assert_best_five(
+        "AS AD AH AC KS QD 2C",
+        "Four of a Kind",
+        "AS AD AH AC KS",
+    )
+
+
+def test_best_five_can_be_entirely_on_board():
+    assert_best_five(
+        "2C 3D AS KS QS JS TS",
+        "Straight Flush",
+        "AS KS QS JS TS",
+    )
