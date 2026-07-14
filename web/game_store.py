@@ -248,6 +248,25 @@ class LobbyTournament:
         ]
 
 
+def tournament_results(lobby: LobbyTournament) -> list[dict[str, int | str | bool]]:
+    standings = lobby.standings()
+    rows = []
+    previous_stack = None
+    previous_place = 0
+    for index, (name, stack) in enumerate(standings, start=1):
+        place = previous_place if stack == previous_stack else index
+        rows.append({
+            "place": place,
+            "name": name,
+            "stack": stack,
+            "is_winner": place == 1,
+            "status": "Победитель" if place == 1 else "Участник",
+        })
+        previous_stack = stack
+        previous_place = place
+    return rows
+
+
 TOURNAMENTS: dict[str, LobbyTournament] = {}
 
 

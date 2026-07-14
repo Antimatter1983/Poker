@@ -140,3 +140,34 @@ def test_overdue_player_turn_auto_checks_or_folds(monkeypatch):
 
     assert timed_out == ["alice"]
     assert table.engine.finished
+
+
+def test_busted_player_receives_cards_but_has_no_actions_and_cannot_change_stack():
+    tournament = Tournament.create_by_admin("admin", "daily", ["alice"], hand_count=1)
+    table = tournament.tables[0]
+    table.player.stack = 0
+
+    tournament.start_next_hand()
+
+    assert len(table.player.cards) == 2
+    assert table.player.stack == 0
+    assert table.engine.legal_actions(table.player) == []
+    assert table.engine.current_player is table.bot
+
+
+def test_tournament_results_assign_places_by_stack():
+    from web import game_store
+
+    lobby = game_store.LobbyTournament("code", "Daily", "admin", player_names=["alice", "bob", "carol"])
+    lobby.start()
+    stacks = {"alice": 1200, "bob": 800, "carol": 1200}
+    for table in lobby.game.tables:
+        table.player.stack = stacks[table.player.player_id]
+
+    rows = game_store.tournament_results(lobby)
+
+    assert [(row["place"], row["name"], row["stack"], row["is_winner"]) for row in rows] == [
+        (1, "alice", 1200, True),
+        (1, "carol", 1200, True),
+        (3, "bob", 800, False),
+    ]
