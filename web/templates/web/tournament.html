@@ -26,10 +26,30 @@
     {% if lobby.status == 'running' %}<form method="post" action="{% url 'web:finish_tournament' lobby.code %}">{% csrf_token %}<button class="text-danger">Завершить</button></form>{% endif %}
   </div>
   {% if is_waiting_room %}<div class="waiting-banner" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}"><strong>Ожидаем остальных игроков</strong><span><b data-finished-count>{{ finished_player_count }}</b> из <b data-total-count>{{ total_player_count }}</b> участников завершили раздачу.</span><small>Следующая раздача откроется автоматически.</small></div>{% endif %}
-  <div class="felt minimal-felt {% if is_postflop %}postflop-felt{% endif %}">
-    <div class="seat opponent"><div class="playing-cards">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>{% if not is_postflop %}<div class="blind-stack blind-stack-{{ bot_blind_role }}" aria-label="{{ bot_blind }} уже поставил {{ bot_committed }}"><span class="chip-pile" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>{{ bot_blind }}</strong><b>{{ bot_committed }}</b></div>{% endif %}</div>
-    {% if is_postflop %}<div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>{% else %}<div class="felt-race-slot">{% if race_standings %}<div class="race-board compact-race" aria-label="Гонка стеков">{% for racer in race_standings %}<div class="race-row"><span class="race-name">{{ racer.name }}</span><div class="race-track"><span class="race-runner" style="left: {{ racer.position }}%">♞</span></div><strong>{{ racer.stack }}</strong></div>{% endfor %}</div>{% endif %}</div>{% endif %}<div class="community"><div class="playing-cards board-cards">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
-    <div class="seat hero-seat">{% if not is_postflop %}<div class="blind-stack blind-stack-{{ hero_blind_role }}" aria-label="{{ hero_blind }} уже поставил {{ hero_committed }}"><span class="chip-pile" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>{{ hero_blind }}</strong><b>{{ hero_committed }}</b></div>{% endif %}<div class="hero-combo-badge {% if is_postflop %}visible{% endif %}"><span>Ваша комбинация</span><strong>{{ hero_hand_summary }}</strong></div><div class="playing-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div></div>
+  <div class="felt minimal-felt gameplay-table">
+    <section class="table-zone bot-zone" aria-label="Зона бота">
+      <div class="seat-header">
+        <strong class="seat-name">Бот</strong>
+        <span class="seat-stack">Стек: {{ table.bot.stack }}</span>
+      </div>
+      <div class="playing-cards hole-cards">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
+      <div class="last-action">Последнее действие: <strong>{{ table.bot.last_action|default:'—' }}</strong></div>
+    </section>
+
+    <section class="table-zone center-zone" aria-label="Центральная зона">
+      <div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
+      <div class="playing-cards board-cards" aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
+      <div class="street-info"><span>Улица: <strong>{{ engine.street|default:'—' }}</strong></span><span>Текущая ставка: <strong>{{ engine.current_bet|default:0 }}</strong></span>{% if action_timer_seconds != None %}<span>Таймер: <strong>{{ action_timer_seconds }} сек</strong></span>{% endif %}</div>
+    </section>
+
+    <section class="table-zone hero-zone" aria-label="Зона игрока">
+      <div class="seat-header">
+        <strong class="seat-name">{{ player_name }}</strong>
+        <span class="seat-stack">Стек: {{ table.player.stack }}</span>
+      </div>
+      <div class="playing-cards hole-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+      <div class="last-action">Последнее действие: <strong>{{ table.player.last_action|default:'—' }}</strong></div>
+    </section>
   </div>
   {% if result %}<div class="result-banner {% if result.player_won %}win{% elif result.split %}split{% else %}loss{% endif %}"><strong>{{ result.verdict }}</strong><span>{{ result.summary }}</span><small>Вы: {{ result.player_hand }} · бот: {{ result.bot_hand }}</small>{% if lobby.status == 'finished' %}<a class="button primary" href="{% url 'web:home' %}">Новая игра</a>{% endif %}</div>{% endif %}
   {% if legal_actions and lobby.status != 'finished' %}
