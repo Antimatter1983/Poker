@@ -1,9 +1,38 @@
 {% extends 'web/base.html' %}
-{% block title %}Лидеры {{ lobby.title }}{% endblock %}
+{% block title %}Итоги · {{ lobby.title }}{% endblock %}
 {% block content %}
-<section class="card">
-  <p class="eyebrow">{{ lobby.title }}</p><h1>Таблица лидеров по фишкам</h1>
-  <ol class="leaderboard">{% for name, stack in lobby.standings %}<li><span>{{ name }}</span><strong>{{ stack }}</strong></li>{% endfor %}</ol>
-  <a class="button" href="{% url 'web:tournament_detail' lobby.code %}">Вернуться к столу</a>
+<section class="card tournament-results-hero">
+  <div class="trophy-art" aria-hidden="true">
+    <div class="trophy-cup">♛</div>
+    <div class="trophy-stem"></div>
+    <div class="trophy-base"></div>
+  </div>
+  <div>
+    <p class="eyebrow">{{ lobby.title }}</p>
+    <h1>Итоги турнира</h1>
+    <p class="results-subtitle">Финальная таблица мест по сумме стеков. Победители подсвечены золотом, остальные игроки остаются в истории турнира.</p>
+  </div>
+</section>
+
+<section class="card results-card">
+  <div class="results-table" role="table" aria-label="Финальные места турнира">
+    <div class="results-row results-head" role="row">
+      <span>Место</span><span>Игрок</span><span>Статус</span><span>Стек</span>
+    </div>
+    {% for row in results %}
+    <div class="results-row {% if row.is_winner %}winner-row{% endif %}" role="row">
+      <span class="place-badge">{% if row.place == 1 %}🏆{% else %}#{{ row.place }}{% endif %}</span>
+      <strong>{{ row.name }}</strong>
+      <span>{{ row.status }}</span>
+      <b>{{ row.stack }}</b>
+    </div>
+    {% empty %}
+    <p class="notice">Пока нет игроков для отображения.</p>
+    {% endfor %}
+  </div>
+  <div class="results-actions">
+    <a class="button primary" href="{% url 'web:home' %}">Вернуться в лобби</a>
+    {% if lobby.status != 'finished' %}<a class="button secondary" href="{% url 'web:tournament_detail' lobby.code %}">Вернуться к столу</a>{% endif %}
+  </div>
 </section>
 {% endblock %}

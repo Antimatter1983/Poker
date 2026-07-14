@@ -58,6 +58,10 @@ class HandEngine:
         self.current_player = self.small_blind_player
         self.last_aggressor = self.big_blind_player.player_id
         self.pending = {p.player_id for p in self.players if p.can_act()}
+        if not self.current_player.can_act():
+            self.current_player = self.big_blind_player if self.big_blind_player.can_act() else None
+            if self.current_player is None:
+                self._runout_and_showdown()
 
     def legal_actions(self, player: Player | None = None) -> list[str]:
         if self.finished:

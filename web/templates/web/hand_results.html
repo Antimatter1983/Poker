@@ -68,7 +68,7 @@
       const response = await fetch(box.dataset.revealStatusUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
       if (!response.ok) return;
       const data = await response.json();
-      if (data.status === 'next_hand' && data.url) window.location.href = data.url;
+      if ((data.status === 'next_hand' || data.status === 'finished') && data.url) window.location.href = data.url;
       if (data.seconds_left !== undefined && seconds) seconds.textContent = data.seconds_left;
     } catch (e) { console.warn('Showdown polling failed', e); }
   }

@@ -101,6 +101,8 @@ def tournament_detail(request: HttpRequest, code: str):
     lobby.advance_finished_hands()
     player_name = request.session.get(f"player:{code}")
     table = lobby.table_for(player_name) if player_name else None
+    if lobby.status == game_store.FINISHED:
+        return redirect("web:leaderboard", code=code)
     if table and lobby.status == game_store.RUNNING and table.engine.finished:
         lobby.mark_waiting_or_reveal()
         if lobby.hand_state == game_store.HAND_REVEAL:
@@ -160,6 +162,8 @@ def reveal_status(request: HttpRequest, code: str, hand_number: int):
     new_hand = lobby.get_or_create_next_hand_after_reveal(hand_number)
     if new_hand:
         return JsonResponse({"status": "next_hand", "url": reverse("web:tournament_detail", kwargs={"code": code})})
+    if lobby.status == game_store.FINISHED:
+        return JsonResponse({"status": "finished", "url": reverse("web:leaderboard", kwargs={"code": code})})
     return JsonResponse({"status": "reveal", "seconds_left": lobby.reveal_seconds_left()})
 
 
@@ -243,7 +247,7 @@ def submit_action(request: HttpRequest, code: str):
 
 def leaderboard(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
-    return render(request, "web/leaderboard.html", {"lobby": lobby})
+    return render(request, "web/leaderboard.html", {"lobby": lobby, "results": game_store.tournament_results(lobby)})
 
 
 @require_POST
