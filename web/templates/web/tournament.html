@@ -26,7 +26,7 @@
     {% if lobby.status == 'running' %}<form method="post" action="{% url 'web:finish_tournament' lobby.code %}">{% csrf_token %}<button class="text-danger">Завершить</button></form>{% endif %}
   </div>
   {% if is_waiting_room %}<div class="waiting-banner" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}"><strong>Ожидаем остальных игроков</strong><span><b data-finished-count>{{ finished_player_count }}</b> из <b data-total-count>{{ total_player_count }}</b> участников завершили раздачу.</span><small>Следующая раздача откроется автоматически.</small></div>{% endif %}
-  <div class="felt minimal-felt gameplay-table" data-deal-table data-hand-id="{{ lobby.code }}-{{ lobby.game.hand_number|default:0 }}" data-can-deal-animate="{% if not is_postflop and not result and hole_cards|length == 2 %}1{% else %}0{% endif %}">
+  <div class="felt minimal-felt gameplay-table" data-deal-table data-hand-id="{{ lobby.code }}-{{ lobby.game.hand_number|default:0 }}" data-can-deal-animate="{% if not is_postflop and not result and hole_cards|length == 2 %}1{% else %}0{% endif %}" data-can-board-animate="{% if is_postflop and not result and board|length > 0 %}1{% else %}0{% endif %}" data-board-count="{{ board|length }}">
     <section class="table-zone bot-zone" aria-label="Зона бота">
       <div class="seat-header">
         <strong class="seat-name">Бот</strong>
@@ -38,7 +38,7 @@
 
     <section class="table-zone center-zone" aria-label="Центральная зона">
       <div class="visual-deck" data-deal-deck aria-hidden="true"><span></span><span></span><span></span></div><div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
-      <div class="playing-cards board-cards" aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
+      <div class="playing-cards board-cards" data-board-cards aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
       <div class="street-info"><span>Улица: <strong>{{ engine.street|default:'—' }}</strong></span><span>Текущая ставка: <strong>{{ engine.current_bet|default:0 }}</strong></span>{% if action_timer_seconds != None %}<span>Таймер: <strong>{{ action_timer_seconds }} сек</strong></span>{% endif %}</div>
     </section>
 
@@ -150,8 +150,83 @@
     checkbox.addEventListener('change', () => {
       localStorage.setItem(storageKey, checkbox.checked ? '1' : '0');
       if (checkbox.checked && running) revealFinalState();
+      if (checkbox.checked) revealBoardFinalState();
     });
   }
+
+  const boardCount = table ? Number(table.dataset.boardCount || 0) : 0;
+  const boardAnimatedKey = handId && boardCount ? `pokerBoardAnimated:${handId}:${boardCount}` : '';
+  let boardRunning = false;
+  let boardTimers = [];
+
+  const revealBoardFinalState = () => {
+    boardTimers.forEach(clearTimeout);
+    boardTimers = [];
+    boardRunning = false;
+    running = false;
+    document.querySelectorAll('.board-flight-card').forEach((card) => card.remove());
+    if (table) table.classList.remove('board-animation-running');
+    document.querySelectorAll('[data-board-cards] .poker-card').forEach((card) => {
+      card.classList.remove('deal-card-hidden');
+      card.classList.remove('deal-card-landed');
+    });
+    setControlsDisabled(false);
+    if (boardAnimatedKey) sessionStorage.setItem(boardAnimatedKey, '1');
+  };
+
+  const runBoardAnimation = () => {
+    if (!table || table.dataset.canBoardAnimate !== '1') return false;
+    const deck = table.querySelector('[data-deal-deck]');
+    const boardCards = Array.from(table.querySelectorAll('[data-board-cards] .poker-card'));
+    if (!deck || !boardCards.length) return false;
+    if ((checkbox && checkbox.checked) || (boardAnimatedKey && sessionStorage.getItem(boardAnimatedKey) === '1')) {
+      revealBoardFinalState();
+      return false;
+    }
+    const makeBoardFlightCard = (target) => {
+      const card = document.createElement('span');
+      card.className = 'poker-card back deal-flight-card board-flight-card';
+      card.textContent = '?';
+      const tableBox = table.getBoundingClientRect();
+      const from = deck.getBoundingClientRect();
+      const to = target.getBoundingClientRect();
+      const startX = from.left + from.width / 2 - tableBox.left - to.width / 2;
+      const startY = from.top + from.height / 2 - tableBox.top - to.height / 2;
+      const endX = to.left - tableBox.left;
+      const endY = to.top - tableBox.top;
+      card.style.width = `${to.width}px`;
+      card.style.left = `${startX}px`;
+      card.style.top = `${startY}px`;
+      table.appendChild(card);
+      requestAnimationFrame(() => {
+        card.style.transform = `translate(${endX - startX}px, ${endY - startY}px) rotate(-2deg)`;
+      });
+      boardTimers.push(setTimeout(() => {
+        target.classList.remove('deal-card-hidden');
+        target.classList.remove('deal-card-landed');
+        void target.offsetWidth;
+        target.classList.add('deal-card-landed');
+        card.style.setProperty('--deal-transform', `translate(${endX - startX}px, ${endY - startY}px) rotate(-2deg)`);
+        card.classList.add('deal-flight-flip');
+        boardTimers.push(setTimeout(() => card.remove(), 170));
+      }, 340));
+    };
+    boardRunning = true;
+    running = true;
+    table.classList.add('board-animation-running');
+    boardCards.forEach((card) => card.classList.add('deal-card-hidden'));
+    setControlsDisabled(true);
+    boardCards.forEach((card, index) => {
+      boardTimers.push(setTimeout(() => makeBoardFlightCard(card), index * 220));
+    });
+    boardTimers.push(setTimeout(() => {
+      revealBoardFinalState();
+      running = false;
+    }, 520 + boardCards.length * 220));
+    return true;
+  };
+
+  if (runBoardAnimation()) return;
   if (!table || table.dataset.canDealAnimate !== '1') return;
   if ((checkbox && checkbox.checked) || (animatedKey && sessionStorage.getItem(animatedKey) === '1')) {
     revealFinalState();
