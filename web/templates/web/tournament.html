@@ -30,24 +30,23 @@
     <section class="table-zone bot-zone" aria-label="Зона бота">
       <div class="seat-header">
         <strong class="seat-name">Добрый Бот</strong>
-        <span class="seat-stack">Стек: {{ table.bot.stack }}</span>
+        <span class="seat-stack gold-stack-badge"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="stack-label">СТЕК</span><strong>{{ table.bot.stack }}</strong></span>
       </div>
       <div class="playing-cards hole-cards" data-deal-target="bot">{% if bot_hidden %}<span class="poker-card back"></span><span class="poker-card back"></span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
-      <div class="last-action">Последнее действие: <strong>{{ table.bot.last_action|default:'—' }}</strong></div>
     </section>
 
     <section class="table-zone center-zone" aria-label="Центральная зона">
-      <div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
+      <div class="table-pot" data-table-pot aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
       <div class="playing-cards board-cards" data-board-cards aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
     </section>
 
     <section class="table-zone hero-zone" aria-label="Зона игрока">
       <div class="seat-header">
         <strong class="seat-name">{{ player_name }}</strong>
-        <span class="seat-stack">Стек: {{ table.player.stack }}</span>
+        <span class="seat-stack gold-stack-badge" data-hero-stack><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="stack-label">СТЕК</span><strong>{{ table.player.stack }}</strong></span>
       </div>
       <div class="playing-cards hole-cards" data-deal-target="hero">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
-      <div class="last-action">Последнее действие: <strong>{{ table.player.last_action|default:'—' }}</strong></div>
+      {% if hero_hand_summary %}<div class="hero-hand-hint" aria-label="Текущая комбинация игрока">{{ hero_hand_summary }}</div>{% endif %}
     </section>
   </div>
   {% if result %}<div class="result-banner {% if result.player_won %}win{% elif result.split %}split{% else %}loss{% endif %}"><strong>{{ result.verdict }}</strong><span>{{ result.summary }}</span><small>Вы: {{ result.player_hand }} · бот: {{ result.bot_hand }}</small>{% if lobby.status == 'finished' %}<a class="button primary" href="{% url 'web:home' %}">Новая игра</a>{% endif %}</div>{% endif %}
@@ -125,10 +124,61 @@
     if (actionPanel) actionPanel.classList.toggle('actions-locked', disabled);
   };
 
-  actionForms.forEach((form) => form.addEventListener('submit', (event) => {
-    if (!running) return;
-    event.preventDefault();
-  }));
+  const animateBetToPot = (form) => {
+    if (!table || !form || form.dataset.betAnimationDone === '1') return false;
+    const submitter = form.dataset.lastSubmitter;
+    const submitterName = form.dataset.lastSubmitterName;
+    const actionInput = form.querySelector('input[name="action"]');
+    const action = submitterName === 'action' ? submitter : (actionInput ? actionInput.value : '');
+    if (!['CALL', 'BET', 'RAISE'].includes(action)) return false;
+    const stack = table.querySelector('[data-hero-stack]');
+    const pot = table.querySelector('[data-table-pot]');
+    if (!stack || !pot) return false;
+    form.dataset.betAnimationDone = '1';
+    const ingot = document.createElement('span');
+    ingot.className = 'bet-flight-ingot';
+    const tableBox = table.getBoundingClientRect();
+    const from = stack.getBoundingClientRect();
+    const to = pot.getBoundingClientRect();
+    const startX = from.left - tableBox.left + from.width / 2 - 13;
+    const startY = from.top - tableBox.top + from.height / 2 - 6;
+    const endX = to.left - tableBox.left + to.width / 2 - 13;
+    const endY = to.top - tableBox.top + to.height / 2 - 6;
+    ingot.style.left = `${startX}px`;
+    ingot.style.top = `${startY}px`;
+    table.appendChild(ingot);
+    setControlsDisabled(true);
+    requestAnimationFrame(() => {
+      ingot.style.transform = `translate(${endX - startX}px, ${endY - startY}px) rotate(-12deg) scale(1.08)`;
+    });
+    setTimeout(() => {
+      if (submitterName && submitter) {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = submitterName;
+        hidden.value = submitter;
+        form.appendChild(hidden);
+      }
+      form.submit();
+    }, 430);
+    return true;
+  };
+
+  actionForms.forEach((form) => {
+    form.querySelectorAll('button[name="action"],button[name="amount"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        form.dataset.lastSubmitterName = button.name;
+        form.dataset.lastSubmitter = button.value;
+      });
+    });
+    form.addEventListener('submit', (event) => {
+      if (running) {
+        event.preventDefault();
+        return;
+      }
+      if (animateBetToPot(form)) event.preventDefault();
+    });
+  });
 
   const revealFinalState = () => {
     timers.forEach(clearTimeout);
