@@ -149,3 +149,18 @@ def test_chip_net_sum_is_preserved_for_reveal_results():
         table.player.stack - table.engine.starting_stacks[table.player.player_id]
         for table in lobby.game.tables
     )
+
+
+def test_final_hand_goes_directly_to_leaderboard_without_extra_reveal():
+    lobby = make_lobby(hand_count=1)
+    finish_player_hand(lobby.game, "alice")
+    finish_player_hand(lobby.game, "bob")
+
+    response = client_as("alice").get(reverse("web:tournament_detail", kwargs={"code": "code"}), follow=True)
+    status = client_as("alice").get(reverse("web:reveal_status", kwargs={"code": "code", "hand_number": 1})).json()
+
+    assert lobby.status == game_store.FINISHED
+    assert response.resolver_match.url_name == "leaderboard"
+    assert "Итоги турнира" in response.content.decode()
+    assert status["status"] == "finished"
+    assert status["url"] == reverse("web:leaderboard", kwargs={"code": "code"})

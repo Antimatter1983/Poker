@@ -10,20 +10,19 @@
   <div>
     <p class="eyebrow">{{ lobby.title }}</p>
     <h1>Итоги турнира</h1>
-    <p class="results-subtitle">Финальная таблица мест по сумме стеков. Победители подсвечены золотом, остальные игроки остаются в истории турнира.</p>
+    <p class="results-subtitle">Турнир завершён. Победитель определяется по самому большому стеку.</p>
   </div>
 </section>
 
 <section class="card results-card">
   <div class="results-table" role="table" aria-label="Финальные места турнира">
     <div class="results-row results-head" role="row">
-      <span>Место</span><span>Игрок</span><span>Статус</span><span>Стек</span>
+      <span>Место</span><span>Игрок</span><span>Стек</span>
     </div>
     {% for row in results %}
     <div class="results-row {% if row.is_winner %}winner-row{% endif %}" role="row">
       <span class="place-badge">{% if row.place == 1 %}🏆{% else %}#{{ row.place }}{% endif %}</span>
       <strong>{{ row.name }}</strong>
-      <span>{{ row.status }}</span>
       <b>{{ row.stack }}</b>
     </div>
     {% empty %}
