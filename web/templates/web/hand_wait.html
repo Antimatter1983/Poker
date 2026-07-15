@@ -11,10 +11,10 @@
 
   <div class="felt minimal-felt">
     <div class="seat opponent">
-      <span class="label">Бот · {{ bot_blind }} против {{ player_name }}</span>
+      <span class="label">Добрый Бот · {{ bot_blind }} против {{ player_name }}</span>
       <div class="blind-stack blind-stack-{{ bot_blind_role }}" aria-label="{{ bot_blind }} уже поставил {{ bot_committed }}"><span class="chip-pile" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>{{ bot_blind }}</strong><b>{{ bot_committed }}</b></div>
       <span class="combo-label">Комбинация: {{ bot_hand_summary }}</span>
-      <div class="playing-cards"><span class="poker-card back">?</span><span class="poker-card back">?</span></div>
+      <div class="playing-cards"><span class="poker-card back"></span><span class="poker-card back"></span></div>
     </div>
     <div class="felt-race-slot">
       {% if race_standings %}<div class="race-board compact-race" aria-label="Гонка стеков">{% for racer in race_standings %}<div class="race-row"><span class="race-name">{{ racer.name }}</span><div class="race-track"><span class="race-runner" style="left: {{ racer.position }}%">♞</span></div><strong>{{ racer.stack }}</strong></div>{% endfor %}</div>{% endif %}
