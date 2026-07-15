@@ -78,3 +78,20 @@ img,svg,canvas,video{max-width:100%;height:auto}
 @media (max-width:340px){.play-screen .gameplay-table{--card-width:40px;--board-card-width:34px}.play-screen .gameplay-table .board-cards{gap:4px}.play-screen .quick-actions button,.play-screen .raise-actions button{flex-basis:82px}}
 @media (min-width:721px){.play-screen .gameplay-table{--card-width:clamp(58px,8vw,82px);--board-card-width:clamp(54px,7vw,76px)}}
 @media (orientation:landscape){.play-screen .play-only{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr) auto}.play-screen .minimal-felt{grid-row:auto}.play-screen .quick-actions,.play-screen .raise-actions{display:flex;flex-wrap:wrap}.play-screen .gameplay-table{--card-width:clamp(42px,13dvh,70px);--board-card-width:clamp(38px,12dvh,62px)}}
+
+/* Stage 2: quick pocket-card deal animation. JS only animates already-rendered cards. */
+.play-screen .gameplay-table{position:relative}
+.visual-deck{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-7deg);width:clamp(34px,7vw,52px);aspect-ratio:2.5/3.5;z-index:1;pointer-events:none;filter:drop-shadow(0 10px 16px rgba(0,0,0,.38))}
+.visual-deck span{position:absolute;inset:0;border:2px solid rgba(255,255,255,.86);border-radius:8px;background:repeating-linear-gradient(45deg,#143c7a,#143c7a 7px,#1f57aa 7px,#1f57aa 14px)}
+.visual-deck span:nth-child(1){transform:translate(-4px,4px)}
+.visual-deck span:nth-child(2){transform:translate(0,0)}
+.visual-deck span:nth-child(3){transform:translate(4px,-4px)}
+.deal-skip-toggle{width:auto;display:inline-flex;grid-template-columns:auto 1fr;align-items:center;gap:6px;color:#d4f8e5;font-size:.82rem;white-space:nowrap;cursor:pointer}
+.deal-skip-toggle input{width:auto;margin:0;accent-color:var(--accent)}
+.deal-card-hidden{opacity:0;visibility:hidden}
+.deal-flight-card{position:absolute;z-index:8;margin:0;pointer-events:none;transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .12s ease;will-change:transform,opacity;transform:translate(0,0) rotate(0deg)}
+.deal-flight-flip{animation:dealHeroFlip .13s ease-in forwards}
+.actions-locked{outline:1px solid rgba(247,201,72,.38);box-shadow:0 0 0 3px rgba(247,201,72,.08)}
+@keyframes dealHeroFlip{0%{transform:var(--deal-transform,none) rotateY(0deg);opacity:1}100%{transform:var(--deal-transform,none) rotateY(88deg);opacity:0}}
+@media (max-width:420px){.visual-deck{width:34px}.deal-skip-toggle{font-size:.72rem;gap:4px}.deal-skip-toggle input{inline-size:14px;block-size:14px}}
+@media (prefers-reduced-motion:reduce){.deal-flight-card{transition:none}.deal-flight-flip{animation:none}}
