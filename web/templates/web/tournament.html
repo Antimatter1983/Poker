@@ -37,7 +37,7 @@
     </section>
 
     <section class="table-zone center-zone" aria-label="Центральная зона">
-      <div class="visual-deck" data-deal-deck aria-hidden="true"><span></span><span></span><span></span></div><div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
+      <div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
       <div class="playing-cards board-cards" data-board-cards aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
       <div class="street-info"><span>Улица: <strong>{{ engine.street|default:'—' }}</strong></span><span>Текущая ставка: <strong>{{ engine.current_bet|default:0 }}</strong></span>{% if action_timer_seconds != None %}<span>Таймер: <strong>{{ action_timer_seconds }} сек</strong></span>{% endif %}</div>
     </section>
@@ -155,7 +155,8 @@
   }
 
   const boardCount = table ? Number(table.dataset.boardCount || 0) : 0;
-  const boardAnimatedKey = handId && boardCount ? `pokerBoardAnimated:${handId}:${boardCount}` : '';
+  const boardProgressKey = handId ? `pokerBoardAnimatedCount:${handId}` : '';
+  const storedBoardCount = boardProgressKey ? Number(sessionStorage.getItem(boardProgressKey) || 0) : 0;
   let boardRunning = false;
   let boardTimers = [];
 
@@ -171,15 +172,15 @@
       card.classList.remove('deal-card-landed');
     });
     setControlsDisabled(false);
-    if (boardAnimatedKey) sessionStorage.setItem(boardAnimatedKey, '1');
+    if (boardProgressKey) sessionStorage.setItem(boardProgressKey, String(boardCount));
   };
 
   const runBoardAnimation = () => {
     if (!table || table.dataset.canBoardAnimate !== '1') return false;
-    const deck = table.querySelector('[data-deal-deck]');
     const boardCards = Array.from(table.querySelectorAll('[data-board-cards] .poker-card'));
-    if (!deck || !boardCards.length) return false;
-    if ((checkbox && checkbox.checked) || (boardAnimatedKey && sessionStorage.getItem(boardAnimatedKey) === '1')) {
+    const newBoardCards = boardCards.slice(Math.min(Math.max(storedBoardCount, 0), boardCards.length));
+    if (!boardCards.length || !newBoardCards.length) return false;
+    if ((checkbox && checkbox.checked)) {
       revealBoardFinalState();
       return false;
     }
@@ -188,10 +189,9 @@
       card.className = 'poker-card back deal-flight-card board-flight-card';
       card.textContent = '?';
       const tableBox = table.getBoundingClientRect();
-      const from = deck.getBoundingClientRect();
       const to = target.getBoundingClientRect();
-      const startX = from.left + from.width / 2 - tableBox.left - to.width / 2;
-      const startY = from.top + from.height / 2 - tableBox.top - to.height / 2;
+      const startX = tableBox.width / 2 - to.width / 2;
+      const startY = tableBox.height / 2 - to.height / 2;
       const endX = to.left - tableBox.left;
       const endY = to.top - tableBox.top;
       card.style.width = `${to.width}px`;
@@ -214,15 +214,15 @@
     boardRunning = true;
     running = true;
     table.classList.add('board-animation-running');
-    boardCards.forEach((card) => card.classList.add('deal-card-hidden'));
+    newBoardCards.forEach((card) => card.classList.add('deal-card-hidden'));
     setControlsDisabled(true);
-    boardCards.forEach((card, index) => {
+    newBoardCards.forEach((card, index) => {
       boardTimers.push(setTimeout(() => makeBoardFlightCard(card), index * 220));
     });
     boardTimers.push(setTimeout(() => {
       revealBoardFinalState();
       running = false;
-    }, 520 + boardCards.length * 220));
+    }, 520 + newBoardCards.length * 220));
     return true;
   };
 
@@ -233,20 +233,18 @@
     return;
   }
 
-  const deck = table.querySelector('[data-deal-deck]');
   const heroCards = Array.from(table.querySelectorAll('[data-deal-target="hero"] .poker-card')).slice(0, 2);
   const botCards = Array.from(table.querySelectorAll('[data-deal-target="bot"] .poker-card')).slice(0, 2);
-  if (!deck || heroCards.length < 2 || botCards.length < 2) return;
+  if (heroCards.length < 2 || botCards.length < 2) return;
 
   const makeFlightCard = (target, reveal) => {
     const card = document.createElement('span');
     card.className = 'poker-card back deal-flight-card';
     card.textContent = '?';
     const tableBox = table.getBoundingClientRect();
-    const from = deck.getBoundingClientRect();
     const to = target.getBoundingClientRect();
-    const startX = from.left + from.width / 2 - tableBox.left - to.width / 2;
-    const startY = from.top + from.height / 2 - tableBox.top - to.height / 2;
+    const startX = tableBox.width / 2 - to.width / 2;
+    const startY = tableBox.height / 2 - to.height / 2;
     const endX = to.left - tableBox.left;
     const endY = to.top - tableBox.top;
     card.style.width = `${to.width}px`;
