@@ -47,6 +47,7 @@
       </div>
       <div class="playing-cards hole-cards" data-deal-target="hero">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
       {% if hero_hand_summary %}<div class="hero-hand-hint" aria-label="Текущая комбинация игрока">{{ hero_hand_summary }}</div>{% endif %}
+      {% if equity %}<div class="equity-box" aria-label="Шансы"><strong>Шансы</strong><span>Победа: {{ equity.win_percent|floatformat:1 }}%</span><span>Ничья: {{ equity.tie_percent|floatformat:1 }}%</span><span>Поражение: {{ equity.loss_percent|floatformat:1 }}%</span><small>{{ equity.method }}</small></div>{% endif %}
     </section>
   </div>
   {% if result %}<div class="result-banner {% if result.player_won %}win{% elif result.split %}split{% else %}loss{% endif %}"><strong>{{ result.verdict }}</strong><span>{{ result.summary }}</span><small>Вы: {{ result.player_hand }} · бот: {{ result.bot_hand }}</small>{% if lobby.status == 'finished' %}<a class="button primary" href="{% url 'web:home' %}">Новая игра</a>{% endif %}</div>{% endif %}
