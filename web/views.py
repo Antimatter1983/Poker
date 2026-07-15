@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import Http404, HttpRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from . import game_store
@@ -76,6 +77,7 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
         "total_player_count": len(lobby.player_names),
     }
 
+@ensure_csrf_cookie
 def home(request: HttpRequest):
     return render(request, "web/home.html", {"tournaments": list(game_store.TOURNAMENTS.values())})
 
@@ -96,6 +98,7 @@ def create_tournament(request: HttpRequest):
     return redirect("web:tournament_detail", code=lobby.code)
 
 
+@ensure_csrf_cookie
 def tournament_detail(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
     lobby.advance_finished_hands()
