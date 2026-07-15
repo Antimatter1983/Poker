@@ -41,8 +41,8 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
     hero_blind, hero_blind_role = _blind_label_and_role(engine, table.player if table else None)
     bot_blind, bot_blind_role = _blind_label_and_role(engine, table.bot if table else None)
     equity = None
-    if table and engine and not engine.finished:
-        equity = calculate_equity(table.player.cards, engine.community_cards)
+    if table and engine and not engine.finished and not engine.community_cards:
+        equity = calculate_equity(table.player.cards)
     return {
         "lobby": lobby,
         "player_name": player_name,
