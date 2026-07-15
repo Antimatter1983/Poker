@@ -137,7 +137,10 @@
     running = false;
     document.querySelectorAll('.deal-flight-card').forEach((card) => card.remove());
     if (table) table.classList.remove('deal-animation-running');
-    document.querySelectorAll('[data-deal-target] .poker-card').forEach((card) => card.classList.remove('deal-card-hidden'));
+    document.querySelectorAll('[data-deal-target] .poker-card').forEach((card) => {
+      card.classList.remove('deal-card-hidden');
+      card.classList.remove('deal-card-landed');
+    });
     setControlsDisabled(false);
     if (animatedKey) sessionStorage.setItem(animatedKey, '1');
   };
@@ -180,12 +183,17 @@
     });
     timers.push(setTimeout(() => {
       target.classList.remove('deal-card-hidden');
+      target.classList.remove('deal-card-landed');
+      void target.offsetWidth;
+      target.classList.add('deal-card-landed');
       if (reveal) {
         card.style.setProperty('--deal-transform', `translate(${endX - startX}px, ${endY - startY}px) rotate(-4deg)`);
         card.classList.add('deal-flight-flip');
+      } else {
+        card.style.opacity = '0';
       }
-      timers.push(setTimeout(() => card.remove(), reveal ? 130 : 40));
-    }, 260));
+      timers.push(setTimeout(() => card.remove(), reveal ? 170 : 120));
+    }, 340));
   };
 
   running = true;
@@ -193,9 +201,9 @@
   [...heroCards, ...botCards].forEach((card) => card.classList.add('deal-card-hidden'));
   setControlsDisabled(true);
   [[heroCards[0], true], [botCards[0], false], [heroCards[1], true], [botCards[1], false]].forEach(([card, reveal], index) => {
-    timers.push(setTimeout(() => makeFlightCard(card, reveal), index * 260));
+    timers.push(setTimeout(() => makeFlightCard(card, reveal), index * 300));
   });
-  timers.push(setTimeout(revealFinalState, 1280));
+  timers.push(setTimeout(revealFinalState, 1580));
 })();
 
 </script>
