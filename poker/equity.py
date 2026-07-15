@@ -148,34 +148,24 @@ def _exact(hole: list[Card], board: list[Card]) -> EquityResult:
     return _result(*counts, method=EXACT)
 
 
-def calculate_equity(hole_cards: Iterable[Card | str], board_cards: Iterable[Card | str] = (), *, simulations: int | None = None, seed: int | None = None, use_cache: bool = True) -> EquityResult:
-    """Return equity using only hero cards and the public board.
+def calculate_equity(hole_cards: Iterable[Card | str], board_cards: Iterable[Card | str] = (), *, simulations: int | None = None, seed: int | None = None, use_cache: bool = True) -> EquityResult | None:
+    """Return preflop equity from the static 169-hand table only.
 
-    Opponent cards are always generated from legal unknown cards; actual bot cards
-    must not be supplied here before showdown.
+    Postflop equity is intentionally disabled for gameplay performance: no
+    Monte Carlo simulations, opponent-hand enumeration, turn/river runouts, or
+    postflop cache lookups are performed after the board opens.
     """
+    del simulations, seed
     hole, board = _validate_state(hole_cards, board_cards)
-    if len(board) == 0:
-        method, sims = PREFLOP, None
-        key = _cache_key(hole, board, method, sims)
-        if use_cache and key in _EQUITY_CACHE:
-            return _EQUITY_CACHE[key]
-        result = EquityResult(*PREFLOP_EQUITY[normalize_starting_hand(hole)], method=method)
-    elif len(board) == 3:
-        method, sims = MONTE_CARLO, simulations or DEFAULT_FLOP_SIMULATIONS
-        key = _cache_key(hole, board, method, sims)
-        if use_cache and seed is None and key in _EQUITY_CACHE:
-            return _EQUITY_CACHE[key]
-        result = _monte_carlo(hole, board, sims, seed)
-    elif len(board) in {4, 5}:
-        method, sims = EXACT, None
-        key = _cache_key(hole, board, method, sims)
-        if use_cache and key in _EQUITY_CACHE:
-            return _EQUITY_CACHE[key]
-        result = _exact(hole, board)
-    else:  # already validated, defensive only
-        raise ValueError("Unsupported board size")
-    if use_cache and not (method == MONTE_CARLO and seed is not None):
+    if board:
+        return None
+
+    method, sims = PREFLOP, None
+    key = _cache_key(hole, board, method, sims)
+    if use_cache and key in _EQUITY_CACHE:
+        return _EQUITY_CACHE[key]
+    result = EquityResult(*PREFLOP_EQUITY[normalize_starting_hand(hole)], method=method)
+    if use_cache:
         _EQUITY_CACHE[key] = result
     return result
 
