@@ -29,17 +29,16 @@
   <div class="felt minimal-felt gameplay-table" data-deal-table data-hand-id="{{ lobby.code }}-{{ lobby.game.hand_number|default:0 }}" data-can-deal-animate="{% if not is_postflop and not result and hole_cards|length == 2 %}1{% else %}0{% endif %}" data-can-board-animate="{% if is_postflop and not result and board|length > 0 %}1{% else %}0{% endif %}" data-board-count="{{ board|length }}">
     <section class="table-zone bot-zone" aria-label="Зона бота">
       <div class="seat-header">
-        <strong class="seat-name">Бот</strong>
+        <strong class="seat-name">Добрый Бот</strong>
         <span class="seat-stack">Стек: {{ table.bot.stack }}</span>
       </div>
-      <div class="playing-cards hole-cards" data-deal-target="bot">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
+      <div class="playing-cards hole-cards" data-deal-target="bot">{% if bot_hidden %}<span class="poker-card back"></span><span class="poker-card back"></span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
       <div class="last-action">Последнее действие: <strong>{{ table.bot.last_action|default:'—' }}</strong></div>
     </section>
 
     <section class="table-zone center-zone" aria-label="Центральная зона">
       <div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
       <div class="playing-cards board-cards" data-board-cards aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
-      <div class="street-info"><span>Улица: <strong>{{ engine.street|default:'—' }}</strong></span><span>Текущая ставка: <strong>{{ engine.current_bet|default:0 }}</strong></span>{% if action_timer_seconds != None %}<span>Таймер: <strong>{{ action_timer_seconds }} сек</strong></span>{% endif %}</div>
     </section>
 
     <section class="table-zone hero-zone" aria-label="Зона игрока">
@@ -187,7 +186,6 @@
     const makeBoardFlightCard = (target) => {
       const card = document.createElement('span');
       card.className = 'poker-card back deal-flight-card board-flight-card';
-      card.textContent = '?';
       const tableBox = table.getBoundingClientRect();
       const to = target.getBoundingClientRect();
       const startX = tableBox.width / 2 - to.width / 2;
@@ -240,7 +238,6 @@
   const makeFlightCard = (target, reveal) => {
     const card = document.createElement('span');
     card.className = 'poker-card back deal-flight-card';
-    card.textContent = '?';
     const tableBox = table.getBoundingClientRect();
     const to = target.getBoundingClientRect();
     const startX = tableBox.width / 2 - to.width / 2;
