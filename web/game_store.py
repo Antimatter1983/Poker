@@ -97,6 +97,9 @@ class LobbyTournament:
             self.finished_hand_at = None
             self.next_hand_actor_name = None
             return
+        if self.game.hand_number >= self.game.hand_count:
+            self.status = FINISHED
+            return
         if self.finished_hand_at is None:
             self.finished_hand_at = monotonic()
             self.next_hand_actor_name = self._latest_finished_player_name()
@@ -126,6 +129,9 @@ class LobbyTournament:
         if self.game is None or self.status != RUNNING:
             return
         if self.all_hands_finished():
+            if self.game.hand_number >= self.game.hand_count:
+                self.status = FINISHED
+                return
             self.start_reveal()
         elif any(table.engine.finished for table in self.game.tables):
             self.hand_state = HAND_WAITING
@@ -136,6 +142,9 @@ class LobbyTournament:
         with _safe_atomic():
             with self._advance_lock:
                 if self.game is None or self.status != RUNNING or not self.all_hands_finished():
+                    return
+                if self.game.hand_number >= self.game.hand_count:
+                    self.status = FINISHED
                     return
                 if self.hand_state != HAND_REVEAL:
                     self.hand_state = HAND_REVEAL

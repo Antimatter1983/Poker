@@ -165,6 +165,8 @@ def reveal_status(request: HttpRequest, code: str, hand_number: int):
     _require_player(lobby, code, request)
     if not lobby.game:
         raise Http404("Турнир не начат")
+    if lobby.status == game_store.FINISHED:
+        return JsonResponse({"status": "finished", "url": reverse("web:leaderboard", kwargs={"code": code})})
     if lobby.hand_state != game_store.HAND_REVEAL and lobby.game.hand_number == hand_number:
         return JsonResponse({"status": "waiting", "finished_count": lobby.finished_player_count(hand_number), "total_count": len(lobby.player_names)})
     new_hand = lobby.get_or_create_next_hand_after_reveal(hand_number)
