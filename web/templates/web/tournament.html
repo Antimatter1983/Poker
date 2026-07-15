@@ -103,6 +103,7 @@
   const checkbox = document.querySelector('[data-skip-deal-animation]');
   const actionPanel = document.querySelector('.action-panel');
   const actionButtons = actionPanel ? Array.from(actionPanel.querySelectorAll('button,input,select')) : [];
+  const disableableActionControls = actionButtons.filter((control) => control.type !== 'hidden' && control.name !== 'csrfmiddlewaretoken');
   const actionForms = actionPanel ? Array.from(actionPanel.querySelectorAll('form')) : [];
   const storageKey = 'pokerSkipDealAnimation';
   const handId = table ? table.dataset.handId : '';
@@ -111,7 +112,7 @@
   let timers = [];
 
   const setControlsDisabled = (disabled) => {
-    actionButtons.forEach((control) => {
+    disableableActionControls.forEach((control) => {
       if (disabled) {
         if (control.disabled) control.dataset.wasDisabledBeforeDeal = '1';
         else control.disabled = true;
