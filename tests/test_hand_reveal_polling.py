@@ -151,7 +151,9 @@ def test_chip_net_sum_is_preserved_for_reveal_results():
     )
 
 
-def test_final_hand_goes_directly_to_leaderboard_without_extra_reveal():
+def test_final_hand_reveals_showdown_before_leaderboard(monkeypatch):
+    now = 100.0
+    monkeypatch.setattr(game_store, "monotonic", lambda: now)
     lobby = make_lobby(hand_count=1)
     finish_player_hand(lobby.game, "alice")
     finish_player_hand(lobby.game, "bob")
@@ -159,8 +161,15 @@ def test_final_hand_goes_directly_to_leaderboard_without_extra_reveal():
     response = client_as("alice").get(reverse("web:tournament_detail", kwargs={"code": "code"}), follow=True)
     status = client_as("alice").get(reverse("web:reveal_status", kwargs={"code": "code", "hand_number": 1})).json()
 
+    assert lobby.status == game_store.RUNNING
+    assert lobby.hand_state == game_store.HAND_REVEAL
+    assert response.resolver_match.url_name == "hand_results"
+    assert "Карты бота" in response.content.decode()
+    assert status == {"status": "reveal", "seconds_left": 10}
+
+    now = 111.0
+    done = client_as("alice").get(reverse("web:reveal_status", kwargs={"code": "code", "hand_number": 1})).json()
+
     assert lobby.status == game_store.FINISHED
-    assert response.resolver_match.url_name == "leaderboard"
-    assert "Итоги турнира" in response.content.decode()
-    assert status["status"] == "finished"
-    assert status["url"] == reverse("web:leaderboard", kwargs={"code": "code"})
+    assert done["status"] == "finished"
+    assert done["url"] == reverse("web:leaderboard", kwargs={"code": "code"})
