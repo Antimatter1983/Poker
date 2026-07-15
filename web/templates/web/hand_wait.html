@@ -27,6 +27,7 @@
       <span class="label">{{ player_name }} · {{ hero_blind }} · ваши карты</span>
       <div class="blind-stack blind-stack-{{ hero_blind_role }}" aria-label="{{ hero_blind }} уже поставил {{ hero_committed }}"><span class="chip-pile" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>{{ hero_blind }}</strong><b>{{ hero_committed }}</b></div>
       <span class="combo-label">Комбинация: {{ hero_hand_summary }}</span>
+      {% if equity %}<div class="equity-box" aria-label="Шансы"><strong>Шансы</strong><span>Победа: {{ equity.win_percent|floatformat:1 }}%</span><span>Ничья: {{ equity.tie_percent|floatformat:1 }}%</span><span>Поражение: {{ equity.loss_percent|floatformat:1 }}%</span><small>{{ equity.method }}</small></div>{% endif %}
       <div class="playing-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
     </div>
   </div>

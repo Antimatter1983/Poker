@@ -8,6 +8,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from . import game_store
+from poker.equity import calculate_equity
 
 
 def _lobby_or_404(code: str) -> game_store.LobbyTournament:
@@ -39,6 +40,9 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
     player_turn = bool(engine and table and not engine.finished and engine.current_player is table.player)
     hero_blind, hero_blind_role = _blind_label_and_role(engine, table.player if table else None)
     bot_blind, bot_blind_role = _blind_label_and_role(engine, table.bot if table else None)
+    equity = None
+    if table and engine and not engine.finished:
+        equity = calculate_equity(table.player.cards, engine.community_cards)
     return {
         "lobby": lobby,
         "player_name": player_name,
@@ -54,6 +58,7 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
         "hero_committed": table.player.street_bet if table else 0,
         "bot_committed": table.bot.street_bet if table else 0,
         "result": game_store.hand_result(engine, table.player.player_id if table else None),
+        "equity": equity,
         "hero_hand_summary": game_store.current_hand_summary_ru((table.player.cards if table else []) + (engine.community_cards if engine else [])),
         "bot_hand_summary": game_store.current_hand_summary_ru((table.bot.cards if table and engine and engine.finished else []) + (engine.community_cards if engine else [])),
         "is_postflop": bool(engine and len(engine.community_cards) >= 3),
