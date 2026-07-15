@@ -22,22 +22,22 @@
 <section class="table card play-only">
   <div class="play-toolbar" aria-label="Навигация стола">
     <a class="icon-link" href="{% url 'web:home' %}" aria-label="Вернуться в лобби">⌂</a>
-    <span>{{ player_name }}{% if not is_postflop %} · {{ hero_blind }}{% endif %} · Раздача {{ lobby.game.hand_number|default:0 }}/{{ lobby.hand_count }}</span>
+    <span>{{ player_name }}{% if not is_postflop %} · {{ hero_blind }}{% endif %} · Раздача {{ lobby.game.hand_number|default:0 }}/{{ lobby.hand_count }}</span><label class="deal-skip-toggle"><input type="checkbox" data-skip-deal-animation> без анимации</label>
     {% if lobby.status == 'running' %}<form method="post" action="{% url 'web:finish_tournament' lobby.code %}">{% csrf_token %}<button class="text-danger">Завершить</button></form>{% endif %}
   </div>
   {% if is_waiting_room %}<div class="waiting-banner" data-status-url="{% url 'web:hand_status' lobby.code completed_hand_number %}"><strong>Ожидаем остальных игроков</strong><span><b data-finished-count>{{ finished_player_count }}</b> из <b data-total-count>{{ total_player_count }}</b> участников завершили раздачу.</span><small>Следующая раздача откроется автоматически.</small></div>{% endif %}
-  <div class="felt minimal-felt gameplay-table">
+  <div class="felt minimal-felt gameplay-table" data-deal-table data-hand-id="{{ lobby.code }}-{{ lobby.game.hand_number|default:0 }}" data-can-deal-animate="{% if not is_postflop and not result and hole_cards|length == 2 %}1{% else %}0{% endif %}">
     <section class="table-zone bot-zone" aria-label="Зона бота">
       <div class="seat-header">
         <strong class="seat-name">Бот</strong>
         <span class="seat-stack">Стек: {{ table.bot.stack }}</span>
       </div>
-      <div class="playing-cards hole-cards">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
+      <div class="playing-cards hole-cards" data-deal-target="bot">{% if bot_hidden %}<span class="poker-card back">?</span><span class="poker-card back">?</span>{% else %}{% for card in bot_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}{% endif %}</div>
       <div class="last-action">Последнее действие: <strong>{{ table.bot.last_action|default:'—' }}</strong></div>
     </section>
 
     <section class="table-zone center-zone" aria-label="Центральная зона">
-      <div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
+      <div class="visual-deck" data-deal-deck aria-hidden="true"><span></span><span></span><span></span></div><div class="table-pot" aria-label="Банк {{ pot_amount }}"><span class="pot-gold-stack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="pot-label">БАНК</span><strong>{{ pot_amount }}</strong></div>
       <div class="playing-cards board-cards" aria-label="Карты борда">{% for card in board %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% empty %}<span class="empty-cards">Префлоп</span>{% endfor %}</div>
       <div class="street-info"><span>Улица: <strong>{{ engine.street|default:'—' }}</strong></span><span>Текущая ставка: <strong>{{ engine.current_bet|default:0 }}</strong></span>{% if action_timer_seconds != None %}<span>Таймер: <strong>{{ action_timer_seconds }} сек</strong></span>{% endif %}</div>
     </section>
@@ -47,7 +47,7 @@
         <strong class="seat-name">{{ player_name }}</strong>
         <span class="seat-stack">Стек: {{ table.player.stack }}</span>
       </div>
-      <div class="playing-cards hole-cards">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
+      <div class="playing-cards hole-cards" data-deal-target="hero">{% for card in hole_cards %}<span class="poker-card {% if card.red %}red{% endif %}"><b>{{ card.rank }}</b><em>{{ card.suit }}</em></span>{% endfor %}</div>
       <div class="last-action">Последнее действие: <strong>{{ table.player.last_action|default:'—' }}</strong></div>
     </section>
   </div>
@@ -99,5 +99,104 @@
   setInterval(poll, 2000);
   poll();
 })();
+
+(function(){
+  const table = document.querySelector('[data-deal-table]');
+  const checkbox = document.querySelector('[data-skip-deal-animation]');
+  const actionPanel = document.querySelector('.action-panel');
+  const actionButtons = actionPanel ? Array.from(actionPanel.querySelectorAll('button,input,select')) : [];
+  const actionForms = actionPanel ? Array.from(actionPanel.querySelectorAll('form')) : [];
+  const storageKey = 'pokerSkipDealAnimation';
+  const handId = table ? table.dataset.handId : '';
+  const animatedKey = handId ? `pokerDealAnimated:${handId}` : '';
+  let running = false;
+  let timers = [];
+
+  const setControlsDisabled = (disabled) => {
+    actionButtons.forEach((control) => {
+      if (disabled) {
+        if (control.disabled) control.dataset.wasDisabledBeforeDeal = '1';
+        else control.disabled = true;
+      } else if (control.dataset.wasDisabledBeforeDeal === '1') {
+        delete control.dataset.wasDisabledBeforeDeal;
+      } else {
+        control.disabled = false;
+      }
+    });
+    if (actionPanel) actionPanel.classList.toggle('actions-locked', disabled);
+  };
+
+  actionForms.forEach((form) => form.addEventListener('submit', (event) => {
+    if (!running) return;
+    event.preventDefault();
+  }));
+
+  const revealFinalState = () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+    running = false;
+    document.querySelectorAll('.deal-flight-card').forEach((card) => card.remove());
+    if (table) table.classList.remove('deal-animation-running');
+    document.querySelectorAll('[data-deal-target] .poker-card').forEach((card) => card.classList.remove('deal-card-hidden'));
+    setControlsDisabled(false);
+    if (animatedKey) sessionStorage.setItem(animatedKey, '1');
+  };
+
+  if (checkbox) {
+    checkbox.checked = localStorage.getItem(storageKey) === '1';
+    checkbox.addEventListener('change', () => {
+      localStorage.setItem(storageKey, checkbox.checked ? '1' : '0');
+      if (checkbox.checked && running) revealFinalState();
+    });
+  }
+  if (!table || table.dataset.canDealAnimate !== '1') return;
+  if ((checkbox && checkbox.checked) || (animatedKey && sessionStorage.getItem(animatedKey) === '1')) {
+    revealFinalState();
+    return;
+  }
+
+  const deck = table.querySelector('[data-deal-deck]');
+  const heroCards = Array.from(table.querySelectorAll('[data-deal-target="hero"] .poker-card')).slice(0, 2);
+  const botCards = Array.from(table.querySelectorAll('[data-deal-target="bot"] .poker-card')).slice(0, 2);
+  if (!deck || heroCards.length < 2 || botCards.length < 2) return;
+
+  const makeFlightCard = (target, reveal) => {
+    const card = document.createElement('span');
+    card.className = 'poker-card back deal-flight-card';
+    card.textContent = '?';
+    const tableBox = table.getBoundingClientRect();
+    const from = deck.getBoundingClientRect();
+    const to = target.getBoundingClientRect();
+    const startX = from.left + from.width / 2 - tableBox.left - to.width / 2;
+    const startY = from.top + from.height / 2 - tableBox.top - to.height / 2;
+    const endX = to.left - tableBox.left;
+    const endY = to.top - tableBox.top;
+    card.style.width = `${to.width}px`;
+    card.style.left = `${startX}px`;
+    card.style.top = `${startY}px`;
+    table.appendChild(card);
+    requestAnimationFrame(() => {
+      card.style.transform = `translate(${endX - startX}px, ${endY - startY}px) rotate(${reveal ? -4 : 4}deg)`;
+    });
+    timers.push(setTimeout(() => {
+      target.classList.remove('deal-card-hidden');
+      if (reveal) {
+        card.style.setProperty('--deal-transform', `translate(${endX - startX}px, ${endY - startY}px) rotate(-4deg)`);
+        card.classList.add('deal-flight-flip');
+      }
+      timers.push(setTimeout(() => card.remove(), reveal ? 130 : 40));
+    }, 260));
+  };
+
+  running = true;
+  table.classList.add('deal-animation-running');
+  [...heroCards, ...botCards].forEach((card) => card.classList.add('deal-card-hidden'));
+  setControlsDisabled(true);
+  [[heroCards[0], true], [botCards[0], false], [heroCards[1], true], [botCards[1], false]].forEach(([card, reveal], index) => {
+    timers.push(setTimeout(() => makeFlightCard(card, reveal), index * 260));
+  });
+  timers.push(setTimeout(revealFinalState, 1280));
+})();
+
 </script>
 {% endblock %}
