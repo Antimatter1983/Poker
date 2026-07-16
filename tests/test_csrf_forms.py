@@ -46,6 +46,24 @@ def test_home_sets_csrf_cookie_and_accepts_create_form_with_token():
     assert next(iter(game_store.TOURNAMENTS.values())).title == "Турнир №7"
 
 
+def test_home_create_form_uses_default_title_without_tournament_number():
+    client = Client(enforce_csrf_checks=True)
+
+    page = client.get(reverse("web:home"))
+    csrf_token = client.cookies[settings.CSRF_COOKIE_NAME].value
+    response = client.post(
+        reverse("web:create_tournament"),
+        {"hand_count": "10", "csrfmiddlewaretoken": csrf_token},
+    )
+
+    assert page.status_code == 200
+    assert response.status_code == 302
+    assert len(game_store.TOURNAMENTS) == 1
+    lobby = next(iter(game_store.TOURNAMENTS.values()))
+    assert lobby.title == "Турнир №1"
+    assert lobby.hand_count == 10
+
+
 def test_admin_tournaments_page_is_served_by_web_app():
     client = Client()
 
@@ -60,13 +78,17 @@ def test_admin_tournaments_page_is_served_by_web_app():
     assert 'value="10"' in content
 
 
-def test_home_page_does_not_show_admin_button():
+def test_home_page_shows_lobby_create_tournament_form():
     client = Client()
 
     response = client.get(reverse("web:home"))
     content = response.content.decode()
 
     assert response.status_code == 200
+    assert "Создать турнир" in content
+    assert "Количество раздач" in content
+    assert 'value="10"' in content
+    assert reverse("web:create_tournament") in content
     assert "Страница администратора" not in content
     assert reverse("web:admin_tournaments") not in content
 
