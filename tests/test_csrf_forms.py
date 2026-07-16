@@ -36,13 +36,14 @@ def test_home_sets_csrf_cookie_and_accepts_create_form_with_token():
     csrf_token = client.cookies[settings.CSRF_COOKIE_NAME].value
     response = client.post(
         reverse("web:create_tournament"),
-        {"title": "Daily", "admin": "Admin", "hand_count": "3", "csrfmiddlewaretoken": csrf_token},
+        {"tournament_number": "7", "hand_count": "3", "csrfmiddlewaretoken": csrf_token},
     )
 
     assert page.status_code == 200
     assert csrf_token
     assert response.status_code == 302
     assert len(game_store.TOURNAMENTS) == 1
+    assert next(iter(game_store.TOURNAMENTS.values())).title == "Турнир №7"
 
 
 def test_admin_tournaments_page_is_served_by_web_app():
@@ -51,7 +52,12 @@ def test_admin_tournaments_page_is_served_by_web_app():
     response = client.get("/admin/tournaments/")
 
     assert response.status_code == 200
-    assert "Создать турнир" in response.content.decode()
+    content = response.content.decode()
+
+    assert "Создать турнир" in content
+    assert "Номер турнира" in content
+    assert "Количество раздач" in content
+    assert 'value="10"' in content
 
 
 def test_home_page_does_not_show_admin_button():

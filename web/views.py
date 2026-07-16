@@ -137,8 +137,10 @@ def admin_tournaments(request: HttpRequest):
 
 @require_POST
 def create_tournament(request: HttpRequest):
-    title = request.POST.get("title", "")
-    admin = request.POST.get("admin", "")
+    tournament_number = request.POST.get("tournament_number", "").strip()
+    if not tournament_number:
+        messages.error(request, "Введите номер турнира")
+        return redirect("web:admin_tournaments")
     try:
         hand_count = int(request.POST.get("hand_count") or 10)
         if not 1 <= hand_count <= 100:
@@ -146,7 +148,8 @@ def create_tournament(request: HttpRequest):
     except ValueError:
         messages.error(request, "Количество раздач должно быть от 1 до 100")
         return redirect("web:admin_tournaments")
-    lobby = game_store.create(title, admin, hand_count)
+    title = f"Турнир №{tournament_number}"
+    lobby = game_store.create(title, "admin", hand_count)
     messages.success(request, "Турнир создан. Отправьте ссылку участникам.")
     return redirect("web:tournament_detail", code=lobby.code)
 
