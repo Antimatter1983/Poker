@@ -15,7 +15,23 @@
   </div>
 </section>
 <section class="grid two">
-  <form class="card stack" method="post" action="{% url 'web:join_tournament' lobby.code %}">{% csrf_token %}<h2>Регистрация игрока</h2><label>Ваше имя <input name="name" value="{{ player_name|default:'' }}" placeholder="Alice"></label><button class="primary">Зарегистрироваться</button></form>
+  <div class="card stack">
+    <h2>Участие игрока</h2>
+    {% if site_player_name %}
+      <p>Здравствуйте, {{ site_player_name }}. Нажмите кнопку, чтобы зарегистрироваться в этом турнире с сохранённым ником.</p>
+      <form method="post" action="{% url 'web:join_tournament' lobby.code %}">{% csrf_token %}<button class="primary">Участвовать</button></form>
+    {% else %}
+      <p>Здравствуйте, новый покупатель. Требуется регистрация на сайте.</p>
+      <form class="stack" method="post" action="{% url 'web:register_site_player' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <label>Ник <input name="nickname" placeholder="Alice" autocomplete="username"></label>
+        <label>Пароль <input name="password" type="password" placeholder="Пароль" autocomplete="current-password"></label>
+        <label class="checkline"><input name="remember" type="checkbox" value="1"> <span>Запомнить</span></label>
+        <button class="primary">Зарегистрироваться на сайте</button>
+      </form>
+    {% endif %}
+  </div>
   <form class="card stack" method="post" action="{% url 'web:start_tournament' lobby.code %}">{% csrf_token %}<h2>Старт</h2><p>Игроки: {{ lobby.player_names|join:', ' }}</p><button class="danger">Начать турнир</button></form>
 </section>
 {% elif table %}
