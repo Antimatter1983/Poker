@@ -4,6 +4,8 @@ from . import views
 app_name = "web"
 urlpatterns = [
     path("", views.home, name="home"),
+    path("register/", views.register_site_player, name="register_site_player"),
+    path("admin/tournaments/", views.admin_tournaments, name="admin_tournaments"),
     path("tournaments/new/", views.create_tournament, name="create_tournament"),
     path("tournaments/<slug:code>/", views.tournament_detail, name="tournament_detail"),
     path("tournaments/<slug:code>/join/", views.join_tournament, name="join_tournament"),

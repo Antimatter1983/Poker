@@ -11,6 +11,10 @@ from . import game_store
 from poker.equity import calculate_equity
 
 
+SITE_PLAYER_SESSION_KEY = "site_player_name"
+SITE_PASSWORD_SESSION_KEY = "site_player_password"
+
+
 def _lobby_or_404(code: str) -> game_store.LobbyTournament:
     try:
         return game_store.get(code)
@@ -32,6 +36,26 @@ def _blind_label_and_role(engine, participant) -> tuple[str, str]:
     if engine.small_blind_player is participant:
         return "МБ", "sb"
     return "ББ", "bb"
+
+
+def _site_player_name(request: HttpRequest) -> str:
+    return str(request.session.get(SITE_PLAYER_SESSION_KEY, "")).strip()
+
+
+def _register_site_player(request: HttpRequest) -> str:
+    name = request.POST.get("nickname", "")[:40].strip()
+    password = request.POST.get("password", "")
+    if not name:
+        raise ValueError("Введите ник")
+    if not password:
+        raise ValueError("Введите пароль")
+    request.session[SITE_PLAYER_SESSION_KEY] = name
+    request.session[SITE_PASSWORD_SESSION_KEY] = password
+    if request.POST.get("remember"):
+        request.session.set_expiry(60 * 60 * 24 * 365)
+    else:
+        request.session.set_expiry(0)
+    return name
 
 
 def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | None, *, is_waiting_room: bool = False, completed_hand_number: int | None = None):
@@ -84,7 +108,31 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
 
 @ensure_csrf_cookie
 def home(request: HttpRequest):
-    return render(request, "web/home.html", {"tournaments": list(game_store.TOURNAMENTS.values())})
+    player_name = _site_player_name(request)
+    return render(
+        request,
+        "web/home.html",
+        {
+            "tournaments": list(game_store.TOURNAMENTS.values()),
+            "site_player_name": player_name,
+        },
+    )
+
+
+@require_POST
+def register_site_player(request: HttpRequest):
+    try:
+        name = _register_site_player(request)
+        messages.success(request, f"Здравствуйте, {name}. Теперь можно участвовать в турнирах одним нажатием.")
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    next_url = request.POST.get("next") or reverse("web:home")
+    return redirect(next_url)
+
+
+@ensure_csrf_cookie
+def admin_tournaments(request: HttpRequest):
+    return render(request, "web/admin_tournaments.html", {"default_hand_count": 10})
 
 
 @require_POST
@@ -92,12 +140,12 @@ def create_tournament(request: HttpRequest):
     title = request.POST.get("title", "")
     admin = request.POST.get("admin", "")
     try:
-        hand_count = int(request.POST.get("hand_count") or 100)
+        hand_count = int(request.POST.get("hand_count") or 10)
         if not 1 <= hand_count <= 100:
             raise ValueError
     except ValueError:
         messages.error(request, "Количество раздач должно быть от 1 до 100")
-        return redirect("web:home")
+        return redirect("web:admin_tournaments")
     lobby = game_store.create(title, admin, hand_count)
     messages.success(request, "Турнир создан. Отправьте ссылку участникам.")
     return redirect("web:tournament_detail", code=lobby.code)
@@ -108,6 +156,7 @@ def tournament_detail(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
     lobby.advance_finished_hands()
     player_name = request.session.get(f"player:{code}")
+    site_player_name = _site_player_name(request)
     table = lobby.table_for(player_name) if player_name else None
     if lobby.status == game_store.FINISHED:
         return redirect("web:leaderboard", code=code)
@@ -116,7 +165,9 @@ def tournament_detail(request: HttpRequest, code: str):
         if lobby.hand_state == game_store.HAND_REVEAL:
             return redirect("web:hand_results", code=code, hand_number=lobby.game.hand_number)
         return redirect("web:hand_wait", code=code, hand_number=lobby.game.hand_number)
-    return render(request, "web/tournament.html", _tournament_context(lobby, player_name))
+    context = _tournament_context(lobby, player_name)
+    context["site_player_name"] = site_player_name
+    return render(request, "web/tournament.html", context)
 
 
 def hand_wait(request: HttpRequest, code: str, hand_number: int):
@@ -180,7 +231,10 @@ def reveal_status(request: HttpRequest, code: str, hand_number: int):
 @require_POST
 def join_tournament(request: HttpRequest, code: str):
     lobby = _lobby_or_404(code)
-    name = request.POST.get("name", "")[:40].strip()
+    name = _site_player_name(request)
+    if not name:
+        messages.error(request, "Сначала зарегистрируйтесь на сайте")
+        return redirect("web:tournament_detail", code=code)
     try:
         if name not in lobby.player_names:
             lobby.add_player(name)

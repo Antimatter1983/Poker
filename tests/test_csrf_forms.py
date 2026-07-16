@@ -51,9 +51,13 @@ def test_tournament_page_sets_csrf_cookie_and_accepts_join_form_with_token():
 
     page = client.get(reverse("web:tournament_detail", kwargs={"code": lobby.code}))
     csrf_token = client.cookies[settings.CSRF_COOKIE_NAME].value
+    client.post(
+        reverse("web:register_site_player"),
+        {"nickname": "Alice", "password": "secret", "csrfmiddlewaretoken": csrf_token},
+    )
     response = client.post(
         reverse("web:join_tournament", kwargs={"code": lobby.code}),
-        {"name": "Alice", "csrfmiddlewaretoken": csrf_token},
+        {"csrfmiddlewaretoken": csrf_token},
     )
 
     assert page.status_code == 200
