@@ -45,6 +45,26 @@ def test_home_sets_csrf_cookie_and_accepts_create_form_with_token():
     assert len(game_store.TOURNAMENTS) == 1
 
 
+def test_admin_tournaments_page_is_served_by_web_app():
+    client = Client()
+
+    response = client.get("/admin/tournaments/")
+
+    assert response.status_code == 200
+    assert "Создать турнир" in response.content.decode()
+
+
+def test_home_page_does_not_show_admin_button():
+    client = Client()
+
+    response = client.get(reverse("web:home"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Страница администратора" not in content
+    assert reverse("web:admin_tournaments") not in content
+
+
 def test_tournament_page_sets_csrf_cookie_and_accepts_join_form_with_token():
     lobby = game_store.create("Daily", "Admin", 3)
     client = Client(enforce_csrf_checks=True)
