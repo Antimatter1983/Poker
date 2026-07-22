@@ -106,6 +106,10 @@ def _tournament_context(lobby: game_store.LobbyTournament, player_name: str | No
         "total_player_count": len(lobby.player_names),
     }
 
+def masha_colt(request: HttpRequest):
+    return render(request, "web/masha_colt.html")
+
+
 @ensure_csrf_cookie
 def home(request: HttpRequest):
     player_name = _site_player_name(request)
