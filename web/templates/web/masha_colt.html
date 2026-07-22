@@ -1,0 +1,16 @@
+{% extends 'web/base.html' %}
+{% block title %}Только для Маши{% endblock %}
+{% block body_class %}masha-colt-page{% endblock %}
+{% block content %}
+<section class="card masha-colt-card">
+  <div class="masha-colt-copy">
+    <p class="eyebrow">Только для Маши</p>
+    <h1>Маша и Colt forever</h1>
+    <p class="muted">Специальная страница с любимым героем из Brawl Stars.</p>
+    <a class="button secondary" href="{% url 'web:home' %}">Вернуться в лобби</a>
+  </div>
+  <div class="masha-colt-art">
+    <img src="https://cdn.brawlify.com/brawlers/model/16000001.png" alt="Colt из Brawl Stars">
+  </div>
+</section>
+{% endblock %}
