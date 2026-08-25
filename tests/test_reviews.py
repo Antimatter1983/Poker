@@ -26,5 +26,6 @@ def test_reviews_page_and_assets_are_available():
     assert "Отзывы покупателей" in content
     assert "Пользователь из Саратова" in content
     assert 'data-voice-audio' in content
+    assert '<audio class="voice-audio" controls' in content
     assert finders.find("web/reviews/1787547870943.jpg")
     assert finders.find("web/reviews/2_5217695076280474580.ogg")
