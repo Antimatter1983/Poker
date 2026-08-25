@@ -12,6 +12,11 @@
       <p>Требуется регистрация на сайте: укажите ник и пароль, чтобы дальше использовать этот ник для участия в турнирах.</p>
     {% endif %}
   </div>
+  <div class="hero-actions">
+    <a class="button reviews-link" href="{% url 'web:reviews' %}">
+      <span aria-hidden="true">★</span> Отзывы покупателей
+    </a>
+  </div>
   <form class="stack auth-form" method="post" action="{% url 'web:register_site_player' %}">
     {% csrf_token %}
     <h2>Простая регистрация</h2>

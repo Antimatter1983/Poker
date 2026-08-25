@@ -110,6 +110,10 @@ def masha_colt(request: HttpRequest):
     return render(request, "web/masha_colt.html")
 
 
+def reviews(request: HttpRequest):
+    return render(request, "web/reviews.html")
+
+
 @ensure_csrf_cookie
 def home(request: HttpRequest):
     player_name = _site_player_name(request)
