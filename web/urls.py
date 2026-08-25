@@ -5,6 +5,7 @@ app_name = "web"
 urlpatterns = [
     path("", views.home, name="home"),
     path("masha-colt/", views.masha_colt, name="masha_colt"),
+    path("reviews/", views.reviews, name="reviews"),
     path("register/", views.register_site_player, name="register_site_player"),
     path("admin/tournaments/", views.admin_tournaments, name="admin_tournaments"),
     path("tournaments/new/", views.create_tournament, name="create_tournament"),
